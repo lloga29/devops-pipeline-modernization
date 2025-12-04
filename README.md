@@ -50,18 +50,31 @@ devops-pipeline-modernization/
 │       ├── ecosystem-integration.yml   # Integración con ecosistema
 │       └── jobs/
 │           ├── kubernetes-deploy-jobs.yml  # Despliegue a Kubernetes
-│           └── Update-tag.yml          # Actualización de tags
+│           ├── Update-tag.yml          # Actualización de tags
+│           └── terraform-iac.yml       # Jobs de Terraform IaC
 │
-└── gitops/                             # Configuraciones GitOps
-    ├── README.md                       # Documentación GitOps
-    ├── argocd-app-sample.yaml         # Ejemplo de aplicación ArgoCD
-    └── envs/                          # Configuraciones por ambiente
-        ├── dev/
-        │   └── values-dev.yaml        # Valores para desarrollo (tag: 0.0.1-dev)
-        ├── qa/
-        │   └── values-qa.yaml         # Valores para QA (tag: 0.1.0-qa)
-        └── prod/
-            └── values-prod.yaml       # Valores para producción (tag: 1.0.0)
+├── gitops/                             # Configuraciones GitOps
+│   ├── README.md                       # Documentación GitOps completa
+│   ├── argocd-app-sample.yaml         # Ejemplo de aplicación ArgoCD
+│   └── envs/                          # Configuraciones por ambiente
+│       ├── dev/
+│       │   └── values-dev.yaml        # Valores para desarrollo (tag: 0.0.1-dev)
+│       ├── qa/
+│       │   └── values-qa.yaml         # Valores para QA (tag: 0.1.0-qa)
+│       └── prod/
+│           └── values-prod.yaml       # Valores para producción (tag: 1.0.0)
+│
+└── iac/                                # Infrastructure as Code (Terraform)
+    ├── README.md                       # Documentación IaC
+    ├── dev/
+    │   ├── main.tf                     # Recursos Terraform para desarrollo
+    │   └── dev.tfvars                  # Variables de desarrollo
+    ├── qa/
+    │   ├── main.tf                     # Recursos Terraform para QA
+    │   └── qa.tfvars                   # Variables de QA
+    └── prod/
+        ├── main.tf                     # Recursos Terraform para producción
+        └── prod.tfvars                 # Variables de producción
 ```
 
 ## 🚀 Características
@@ -72,12 +85,20 @@ devops-pipeline-modernization/
 - **Quality Gates**: Tests de arquitectura, integración, rendimiento y seguridad
 - **Artifacts Management**: Gestión centralizada de artefactos
 - **Kubernetes Deploy**: Despliegue automatizado a clusters Kubernetes
+- **IaC Integration**: Integración con Terraform para gestión de infraestructura
 
 ### GitOps
 - **ArgoCD Integration**: Despliegue declarativo mediante ArgoCD
 - **Multi-Environment**: Configuraciones separadas para dev, qa y prod
 - **Semantic Versioning**: Tags semánticos en todas las imágenes
 - **Auto-Sync**: Sincronización automática con self-healing
+
+### Infrastructure as Code (IaC)
+- **Terraform**: Definición declarativa de infraestructura Azure
+- **Multi-Environment**: Configuraciones separadas por ambiente
+- **AKS Clusters**: Provisionamiento automatizado de Kubernetes
+- **ACR Integration**: Azure Container Registry con integración automática
+- **Remote State**: Backend remoto para gestión de estado compartido
 
 ## 📋 Uso
 
@@ -91,18 +112,27 @@ devops-pipeline-modernization/
 2. Ajuste los valores por ambiente en `gitops/envs/{env}/values-{env}.yaml`
 3. ArgoCD sincronizará automáticamente los cambios del repositorio
 
+### Infrastructure as Code
+1. Navegue al ambiente deseado: `cd iac/{env}`
+2. Inicialice Terraform: `terraform init`
+3. Revise los cambios: `terraform plan -var-file={env}.tfvars`
+4. Aplique la infraestructura: `terraform apply -var-file={env}.tfvars`
+
 ## 🔒 Mejores Prácticas
 
 - **Tags Semánticos**: Nunca use `latest` o `stable`, siempre versiones semánticas
 - **Security Gates**: Todos los despliegues pasan por validaciones de seguridad
 - **GitOps**: El repositorio es la única fuente de verdad
 - **Ambientes Separados**: Configuraciones aisladas por ambiente
+- **IaC Declarativo**: Infraestructura versionada y reproducible
+- **State Management**: Backend remoto de Terraform para colaboración
 - **Auto-Healing**: ArgoCD corrige automáticamente las desviaciones
 
 ## 📚 Documentación Adicional
 
 - Ver `pipeline/recomendaciones.md` para mejores prácticas de pipelines
 - Ver `gitops/README.md` para detalles de configuración GitOps
+- Ver `iac/README.md` para instrucciones de Infrastructure as Code
 
 ## 🤝 Contribución
 
