@@ -1,0 +1,21 @@
+variables:
+ 
+ JAVA_HOME           : '/usr/lib/jvm/java-17-openjdk-amd64'
+ JAVA_HOME_11_X64    : '/usr/lib/jvm/java-11-openjdk-amd64'
+ JAVA_HOME_17_X64    : '/usr/lib/jvm/java-17-openjdk-amd64'
+ JAVA_HOME_8_X64     : '/usr/lib/jvm/java-8-openjdk-amd64'
+ MAVEN_HOME : '/usr/local/apache-maven/apache-maven-3.3.9'
+ M2 :  '%MAVEN_HOME%\bin'
+ 
+
+
+#
+ #JAVA_HOME           : '/usr/lib/jvm/temurin-11-jdk-amd64'
+ #JAVA_HOME_11_X64    : '/usr/lib/jvm/temurin-11-jdk-amd64'
+ #JAVA_HOME_17_X64    : '/usr/lib/jvm/temurin-17-jdk-amd64'
+ #JAVA_HOME_8_X64     : '/usr/lib/jvm/temurin-8-jdk-amd64'
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,199 @@
+trigger:
+
+  - master
+  - support/*
+  - release/*
+  - feature/*
+  - develop/*
+
+
+parameters:
+  - name: language
+    type: string
+    default: default
+    values:
+    - netcore
+    - java
+
+  - name: build
+    type: string
+    default: gradle
+    values:
+    - gradle
+    - maven
+    - msbuild
+
+  - name: type
+    type: string
+    default: api
+    values:
+    - api
+    - worker
+    - cronjob
+
+  - name: javaversion
+    type: string
+    default: '11'
+    values:
+    - '8'
+    - '11'
+    - '17'
+
+  - name: typerelease
+    type: string
+    default: aks
+    values:
+    - aks
+  
+  - name: masteraks
+    type: string
+    default: AksSatrack3
+    values:
+    - AksSatrack3
+    - Aks-Tracking-Platform
+    - Aks-app-integrations
+    - aks-products
+    - Aks-Tracking-Platform2
+    - AksSatrackBigData
+    
+
+  - name: performance
+    displayName: 'Performance Testing'
+    type: boolean
+    default: false 
+    values:
+    - false
+    - true
+
+  - name: architecture
+    displayName: 'Architecture Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: component
+    displayName: 'Component Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: unitest
+    displayName: 'Unit Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: integration
+    displayName: 'Integration Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: contractprovider
+    displayName: 'Contract Provider Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: contractconsumer
+    displayName: 'Contract Consumer Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+  - name: publicinterface
+    displayName: 'Public Interface Testing'
+    type: boolean
+    default: false
+    values:
+    - false
+    - true
+
+stages:
+
+  - ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/heads/feature'), eq(variables['Build.SourceBranch'], 'refs/heads/develop'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix')) }}:
+    - template: build/development-integration.yml
+      parameters:
+        language: ${{ parameters.language }}
+        build: ${{ parameters.build }}
+        type: ${{ parameters.type }} 
+        unitest: ${{ parameters.unitest }} 
+        component: ${{ parameters['component'] }} 
+        javaversion: ${{ parameters['javaversion'] }}
+
+  - ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(parameters['architecture'], true) )}}:
+      - template: qa/technical-excellence-assurance.yml
+        parameters:
+          language: ${{ parameters.language }}
+          build: ${{ parameters.build }}
+
+  - ${{ if or( eq(variables['Build.SourceBranch'], 'refs/heads/develop'), in(variables['Build.SourceBranch'], 'refs/heads/release', 'refs/heads/master' , 'refs/heads/support' , 'refs/heads/main' ), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix')) }}: 
+    - template: release/artifacts-management.yml
+      parameters:
+        language: ${{ parameters.language }}
+        typerelease: ${{ parameters.typerelease }}
+        masteraks: ${{ parameters.masteraks }}
+        type: ${{ parameters.type }}
+        architecture: ${{ parameters.architecture }}
+  
+  ##- ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), in(variables['Build.SourceBranch'], 'refs/heads/release' )) }}:
+  ##  - template: release/artifacts-management.yml
+  ##    parameters:
+  ##      language: ${{ parameters.language }}
+  ##      typerelease: ${{ parameters.typerelease }}
+  ##      type: ${{ parameters.type }}
+  ##      architecture: ${{ parameters.architecture }}
+
+  - ${{ if or( eq(variables['Build.SourceBranch'], 'refs/heads/develop'), in(variables['Build.SourceBranch'], 'refs/heads/release', 'refs/heads/support' , 'refs/heads/main', 'refs/heads/master' )) }}:
+    - template: release/ecosystem-integration.yml
+      parameters:
+        language: ${{ parameters.language }}
+        type: ${{ parameters.type }}
+        typerelease: ${{ parameters.typerelease }}
+        masteraks: ${{ parameters.masteraks }}
+        architecture: ${{ parameters.architecture }}
+  
+  ##- ${{ if or( eq(variables['Build.SourceBranch'], 'refs/heads/develop'), in(variables['Build.SourceBranch'], 'refs/heads/release' )) }}:  
+  ##  - template: release/ecosystem-integration.yml
+  ##    parameters:
+  ##      language: ${{ parameters.language }}
+  ##      type: ${{ parameters.type }}
+  ##      typerelease: ${{ parameters.typerelease }}
+  ##      architecture: ${{ parameters.architecture }}
+
+  - ${{ if and(eq(parameters.publicinterface, true), eq(variables['Build.SourceBranch'], 'refs/heads/release')) }}: 
+    - template: qa/public-interface-tests.yml
+      parameters:
+        language: ${{ parameters.language }}
+
+  - ${{ if and(or(eq(parameters.contractprovider, true), eq(parameters.contractconsumer, true), eq(parameters.integration, true)), eq(variables['Build.SourceBranch'], 'refs/heads/release')) }}: 
+    - template: qa/integration-tests.yml
+      parameters:
+        language: ${{ parameters.language }}
+        build: ${{ parameters.build }}
+        contractconsumer: ${{parameters.contractconsumer}}
+        integration: ${{parameters.integration}}
+        contractprovider: ${{parameters.contractprovider}}
+        
+  - ${{ if and(eq(parameters.performance, true), eq(variables['Build.SourceBranch'], 'refs/heads/release')) }}: 
+    - template: qa/performance-tests.yml
+      parameters:
+        language: ${{ parameters.language }}
+
+  - ${{ if or(in(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix')) }}:
+    - template: release/create-pull-request.yml   
+
+
+

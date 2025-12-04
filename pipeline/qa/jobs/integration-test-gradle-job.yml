@@ -1,0 +1,41 @@
+jobs:
+  - job: 'integration_test_gradle'
+    displayName: 'Integration Tests gradle'
+    pool:
+      name: hosted-dockerized-linux
+    
+    steps:
+      - checkout: self
+
+      - ${{ if eq(parameters.integration, true) }}: 
+        - task: Gradle@2
+          displayName: 'Gradle Integration Test'
+          inputs:
+            gradleWrapperFile: 'gradlew'
+            tasks: 'test --tests *IntegrationTest*'
+            publishJUnitResults: true
+            jdkVersionOption: 1.11
+            testResultsFiles: '**/TEST-*.xml'
+            testRunTitle: IntegrationTest Results
+
+      - ${{ if eq(parameters.contractconsumer, true) }}:    
+        - task: Gradle@2
+          displayName: 'Gradle Contract Consumer Test'
+          inputs:
+            gradleWrapperFile: 'gradlew'
+            tasks: 'test --tests *ContractConsumerTest*'
+            publishJUnitResults: true
+            jdkVersionOption: 1.11
+            testResultsFiles: '**/TEST-*.xml'
+            testRunTitle: ContractConsumerTest Results
+
+      - ${{ if eq(parameters.contractprovider, true) }}:    
+        - task: Gradle@2
+          displayName: 'Gradle Contract Provider Test'
+          inputs:
+            gradleWrapperFile: 'gradlew'
+            tasks: 'test --tests *ContractProviderTest*'
+            publishJUnitResults: true
+            jdkVersionOption: 1.11
+            testResultsFiles: '**/TEST-*.xml'
+            testRunTitle: ContractProviderTest Results

@@ -1,0 +1,54 @@
+jobs:
+  - job: 'performance_test'
+    displayName: 'Performance Test'
+    pool:
+      vmImage: 'ubuntu-18.04' 
+
+    steps:
+
+      - checkout: git://$(PerformanceTest)
+
+      - task: AlexandreGattiker.jmeter-tasks.custom-jmeter-installer-task.JMeterInstaller@0
+        displayName: 'Install JMeter 5.2.1'
+        inputs:
+          jmeterVersion: 5.2.1
+
+      - task: UsePythonVersion@0
+        displayName: 'Use Python 3.6'
+        inputs:
+          versionSpec: 3.6
+
+      - task: AlexandreGattiker.jmeter-tasks.custom-taurus-installer-task.TaurusInstaller@0
+        displayName: 'Install Taurus 1.14.1'
+        inputs:
+          taurusVersion: 1.14.1
+          
+      - task: AlexandreGattiker.jmeter-tasks.custom-taurus-runner-task.TaurusRunner@0
+        displayName: 'Run Base Line Performance Tests'
+        inputs:
+          taurusArguments: |
+            $(System.DefaultWorkingDirectory)/yml/$(PerformancePrefix)-base-line.yml
+          reportName: BaseLinePerformanceResults
+        continueOnError: true
+
+      - script: 'rm -rf taurus-output'
+        displayName: 'Clean Performance Report '
+
+      - task: AlexandreGattiker.jmeter-tasks.custom-taurus-runner-task.TaurusRunner@0
+        displayName: 'Run Load Performance Tests'
+        inputs:
+          taurusArguments: |
+            $(System.DefaultWorkingDirectory)/yml/$(PerformancePrefix)-load.yml
+          reportName: LoadPerformanceResults
+        continueOnError: true
+
+      - script: 'rm -rf taurus-output'
+        displayName: 'Clean Performance Report'
+
+      - task: AlexandreGattiker.jmeter-tasks.custom-taurus-runner-task.TaurusRunner@0
+        displayName: 'Run Stress Performance Tests'
+        inputs:
+          taurusArguments: |
+             $(System.DefaultWorkingDirectory)/yml/$(PerformancePrefix)-stress.yml
+          reportName: StressPerformanceResults
+        continueOnError: true

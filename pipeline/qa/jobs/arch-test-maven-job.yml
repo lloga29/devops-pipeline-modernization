@@ -1,0 +1,23 @@
+jobs:
+  - job: 'architecture_adherence_maven'
+    displayName: 'Architecture Adherence Automation Test'
+    pool:
+      name: hosted-dockerized-linux
+    
+    steps:
+
+      - checkout: self
+
+      - task: Maven@3
+        displayName: 'Maven Architecture Test'
+        inputs:
+          mavenPomFile: 'pom.xml'
+          publishJUnitResults: true
+          testResultsFiles: '**/TEST-*.xml'
+          javaHomeOption: 'JDKVersion'
+          mavenVersionOption: Path
+          mavenDirectory: '/opt/apache-maven-3.3.9'
+          mavenAuthenticateFeed: false
+          effectivePomSkip: false
+          sqMavenPluginVersionChoice: 'latest'
+          options: 'test -Dtest=*ArchTest*'

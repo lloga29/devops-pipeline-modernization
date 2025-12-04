@@ -1,0 +1,106 @@
+  jobs:
+  - job: 'update_tag'
+    displayName: 'Update Tag'
+    dependsOn: 'release_aks'
+    pool: 
+      name: Vmss-Agents
+
+   
+
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      variables:
+      - template: ../../SatrackVars.yml
+        
+
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+      variables:
+      - template: ../../SatrackVars.yml
+
+    ${{ if and(eq(parameters['masteraks'], 'AksSatrackBigData'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      variables:
+      - template: ../../SatrackVars-Bigdata.yml
+      
+    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      variables:
+      - template: ../../SatrackVars-tracking.yml
+    
+    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform2'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      variables:
+      - template: ../../SatrackVars-tracking2.yml
+
+    
+    ${{ if and(eq(parameters['masteraks'], 'AksSatrack3'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+
+      variables:
+      - template: ../../SatrackVars-aks3.yml
+        
+    
+    ${{ if and(eq(parameters['masteraks'], 'aks-products'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      variables:
+      - template: ../../SatrackVars-products.yml
+    
+    ${{ if and(eq(parameters['masteraks'], 'Aks-app-integrations'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+
+      variables:
+      - template: ../../SatrackVars-app.yml 
+    
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+      variables:
+      - template: ../../SatrackVars.yml
+
+
+    steps:
+    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:                     
+          - task: Docker@0
+            displayName: 'Pull Development Container Image'
+            inputs:
+                azureSubscription: ${{ variables.DevAcrSubscription }}
+                azureContainerRegistry: $(DevAcr)
+                action: 'Run a Docker command'
+                customCommand: 'pull $(DevAcr)/$(ImageName):$(Build.BuildNumber)'
+
+          - task: Docker@1
+            displayName: 'Tag Container Image Develop'
+            inputs:
+                azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
+                azureContainerRegistry: $(DevAcr)
+                command: 'Tag image'
+                arguments: '$(DevAcr)/$(ImageName):dev-latest'
+                imageName: '$(DevAcr)/$(ImageName):$(Build.BuildNumber)'
+
+        
+          - task: Docker@1
+            displayName: 'Push an image'
+            inputs:
+                azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
+                azureContainerRegistry: $(DevAcr)
+                command: 'Push an image'
+                imageName: '$(DevAcr)/$(ImageName):dev-latest'
+
+    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+          - task: Docker@0
+            displayName: 'Pull Development Container Image'
+            inputs:
+                azureSubscription: ${{ variables.QaAcrSubscription }}
+                azureContainerRegistry: $(QaAcr)
+                action: 'Run a Docker command'
+                customCommand: 'pull $(QaAcr)/$(ImageName):$(Build.BuildNumber)'
+
+          - task: Docker@1
+            displayName: 'Tag Container Image Release'
+            inputs:
+                azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+                azureContainerRegistry: $(QaAcr)
+                command: 'Tag image'
+                arguments: '$(QaAcr)/$(ImageName):qa-latest'
+                imageName: '$(QaAcr)/$(ImageName):$(Build.BuildNumber)'
+
+          - task: Docker@1
+            displayName: 'Push Container Image Release'
+            inputs:
+                azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+                azureContainerRegistry: $(QaAcr)
+                command: 'Push an image'
+                imageName: '$(QaAcr)/$(ImageName):qa-latest'
+          
+    

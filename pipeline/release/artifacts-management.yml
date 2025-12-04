@@ -1,0 +1,217 @@
+stages:
+
+- stage: 'artifacts_managment'
+  variables:
+  - template: ../SatrackVars.yml
+  pool:
+    name: Vmss-Agents
+
+  
+
+  displayName: 'Artifacts Managment'
+  ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(parameters.architecture, true)) }}:
+    dependsOn: 
+      - 'technical_excellence_assurance'
+      - 'development_integration'
+    condition:
+      and(
+        in(dependencies.technical_excellence_assurance.result, 'Succeeded', 'SucceededWithIssues'),
+        in(dependencies.development_integration.result, 'Succeeded', 'SucceededWithIssues')
+      ) 
+  ${{ if and(eq(parameters.architecture, false), eq(variables['Build.SourceBranch'], 'refs/heads/develop')) }}:
+    dependsOn:  
+        - 'development_integration'
+    condition: in(dependencies.development_integration.result, 'Succeeded', 'SucceededWithIssues') 
+     
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+    dependsOn: []
+  
+  ${{ if in(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+    dependsOn: []
+
+  ${{ if in(variables['Build.SourceBranch'], 'refs/heads/master' , 'refs/heads/main') }}:
+    dependsOn: []          
+
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix') }}:
+    dependsOn:
+        - 'development_integration'
+    condition: in(dependencies.development_integration.result, 'Succeeded', 'SucceededWithIssues') 
+
+  jobs:
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    - job: 'publish_image_dev'
+      displayName: 'Publish Docker Image Development Environment'     
+
+      steps:
+        - task: replacetokens@3
+          displayName: 'Replace Tokens Dockerfile'
+          inputs:
+              targetFiles: |
+                **/Dockerfile
+                **/NuGet.config
+        
+        #- task: Bash@3
+        #  displayName: 'Show Dockerfile'
+        #  inputs:
+        #      targetType: 'inline'
+        #      script: 'cat **/Dockerfile'
+
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            artifact: 'Artifact-$(Build.Repository.Name)'
+            path: '$(System.DefaultWorkingDirectory)/target'
+                      
+        - task: Docker@1
+          displayName: 'Build an image'
+          inputs:
+            azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
+            azureContainerRegistry: $(DevAcr)
+            dockerFile: '**/Dockerfile' 
+            imageName: '$(ImageName):$(Build.BuildNumber)'
+          
+        - task: Docker@1
+          displayName: 'Push an image'
+          inputs:
+            azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
+            azureContainerRegistry: $(DevAcr)
+            command: 'Push an image'
+            imageName: '$(ImageName):$(Build.BuildNumber)'
+
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix') }}:
+    - job: 'publish_image_hotfix'
+      displayName: 'Publish Docker Image From Hotfix'     
+
+      steps:
+        - task: replacetokens@3
+          displayName: 'Replace Tokens Dockerfile'
+          inputs:
+              targetFiles: |
+                **/Dockerfile
+                **/NuGet.config
+        
+        #- task: Bash@3
+        #  displayName: 'Show Dockerfile'
+        #  inputs:
+        #      targetType: 'inline'
+        #      script: 'cat **/Dockerfile'
+
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            artifact: 'Artifact-$(Build.Repository.Name)'
+            path: '$(System.DefaultWorkingDirectory)/target'
+                      
+        - task: Docker@1
+          displayName: 'Build an image'
+          inputs:
+            azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+            azureContainerRegistry: $(QaAcr)
+            dockerFile: '**/Dockerfile' 
+            imageName: '$(ImageName):qa-latest'
+          
+        - task: Docker@1
+          displayName: 'Push an image'
+          inputs:
+            azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+            azureContainerRegistry: $(QaAcr)
+            command: 'Push an image'
+            imageName: '$(ImageName):qa-latest'
+  
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+    - template: ../general/semantic-version-job.yml
+    - job: 'publish_image_qa' 
+      displayName: 'Publish Docker Image Release Environment'
+      dependsOn: 'semantic_version'
+      steps:
+
+        - task: Docker@0
+          displayName: 'Pull Development Container Image'
+          inputs:
+              azureSubscription: ${{ variables.DevAcrSubscription }}
+              azureContainerRegistry: $(DevAcr)
+              action: 'Run a Docker command'
+              customCommand: 'pull $(DevAcr)/$(ImageName):dev-latest'
+
+        - task: Docker@1
+          displayName: 'Tag Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              command: 'Tag image'
+              arguments: '$(QaAcr)/$(ImageName):$(Build.BuildNumber)'
+              imageName: '$(DevAcr)/$(ImageName):dev-latest'
+
+        - task: Docker@1
+          displayName: 'Push Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              command: 'Push an image'
+              imageName: $(QaAcr)/$(ImageName):$(Build.BuildNumber)
+
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    - template: ../general/semantic-version-job.yml
+    - job: 'publish_image_pdn'
+      displayName: 'Publish Docker Image Release Environment'
+      dependsOn: 'semantic_version'
+      steps:
+
+        - task: Docker@0
+          displayName: 'Pull Development Container Image'
+          inputs:
+              azureSubscription: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              action: 'Run a Docker command'
+              customCommand: 'pull $(QaAcr)/$(ImageName):qa-latest'
+
+        - task: Docker@1
+          displayName: 'Tag Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              command: 'Tag image'
+              arguments: '$(PdnAcr)/$(ImageName):$(Build.BuildNumber)'
+              imageName: '$(QaAcr)/$(ImageName):qa-latest'
+
+        - task: Docker@1
+          displayName: 'Push Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.PdnAcrSubscription }}
+              azureContainerRegistry: $(PdnAcr)
+              command: 'push'
+              imageName: $(PdnAcr)/$(ImageName):$(Build.BuildNumber)
+
+
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+    - template: ../general/semantic-version-job.yml
+    - job: 'publish_image_pdn_atp'
+      variables:
+          TagNumber: $[dependencies.semantic_version.outputs['setvariablebuild.TagNumber'] ]  
+      displayName: 'Publish Docker Image Release Environment'
+      dependsOn: 'semantic_version'
+      steps:
+
+        - task: Docker@0
+          displayName: 'Pull Development Container Image'
+          inputs:
+              azureSubscription: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              action: 'Run a Docker command'
+              customCommand: 'pull $(QaAcr)/$(ImageName):$(TagNumber)'
+
+        - task: Docker@1
+          displayName: 'Tag Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
+              azureContainerRegistry: $(QaAcr)
+              command: 'Tag image'
+              arguments: '$(PdnAcr)/$(ImageName):$(TagNumber)'
+              imageName: '$(QaAcr)/$(ImageName):$(TagNumber)'
+
+        - task: Docker@1
+          displayName: 'Push Container Image Release'
+          inputs:
+              azureSubscriptionEndpoint: ${{ variables.PdnAcrSubscription }}
+              azureContainerRegistry: $(PdnAcr)
+              command: 'push'
+              imageName: $(PdnAcr)/$(ImageName):$(TagNumber)
+

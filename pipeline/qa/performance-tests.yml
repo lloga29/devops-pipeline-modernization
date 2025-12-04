@@ -1,0 +1,15 @@
+stages:
+- stage: 'performance_tests'
+  displayName: 'Performance Tests'
+  dependsOn:
+  - 'integration_tests'
+  - 'public_interface_tests'
+  condition: 
+    and(
+      in(dependencies.integration_tests.result, 'Succeeded', 'SucceededWithIssues'),
+      in(dependencies.public_interface_tests.result, 'Succeeded', 'SucceededWithIssues')
+    )
+  pool:
+    name: hosted-dockerized-linux
+  jobs:
+  - template: jobs/performance-test-job.yml

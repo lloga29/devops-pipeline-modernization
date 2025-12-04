@@ -1,0 +1,148 @@
+stages:
+- stage: 'create_pull_request'
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix') }}:
+    displayName: 'Create Pull Request To Master'
+    dependsOn: 
+      - 'artifacts_managment'
+    variables:
+    - name: originBranch
+      value: hotfix/$(Build.SourceBranchName)
+    - name: destinyBranch
+      value: master  
+    condition: eq(dependencies.artifacts_managment.result, 'Succeeded')
+
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    displayName: 'Create Pull Request To Develop'
+    # dependsOn: 
+    #   - 'ecosystem_integration'
+    variables:
+    - name: destinyBranch
+      value: develop  
+    # condition: eq(dependencies.ecosystem_integration.result, 'Succeeded')
+      
+  jobs:
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix') }}:
+    - job: 'pr_commit_api'
+      displayName: 'Searching Active PR To Master'
+      pool:
+        name: 'hosted-dockerized-linux'
+      steps:
+        - script: |
+            organization_uri=$(System.CollectionUri)
+            project=$(System.TeamProject)
+            repository=$(Build.Repository.Name)	
+            targetRefName='refs/heads/master'
+            sourceRefName='refs/heads/hotfix/$(Build.SourceBranchName)'
+            url="$organization_uri$project/_apis/git/repositories/$repository/pullrequests?searchCriteria.targetRefName=$targetRefName&api-version=7.0&searchCriteria.status=active&searchCriteria.sourceRefName=$sourceRefName"
+
+            pull_requests=$(curl -X GET \
+            --header 'Authorization: Bearer $(System.AccessToken)' $url \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json')
+
+            # Process the response as needed
+            echo "$pull_requests"
+
+            num_pull_requests=$(echo "$pull_requests" | jq '.count')
+            echo $num_pull_requests
+
+            echo "##vso[task.setvariable variable=num_pull_requests;isOutput=true]$num_pull_requests"
+
+            if [[ $num_pull_requests -gt 0 ]]; then
+                echo "There is an active pull request to master. Skipping the PR task."
+            else                
+                echo "Creating the new PR"
+            fi
+          name: SearchingPRExists
+    - job: 'pull_request_master'
+      displayName: 'Create Pull Request'
+      dependsOn: 
+        - 'pr_commit_api'
+      pool:
+        name: 'Azure Pipelines'
+        VmImage: windows-2022  
+      variables:
+        num_pull_requests: $[ dependencies.pr_commit_api.outputs['SearchingPRExists.num_pull_requests'] ]
+      condition: eq(variables['num_pull_requests'], '0')
+      steps:
+        - task: CreatePullRequest@1
+          displayName: 'Create Pull Request To Master'
+          condition: eq(variables['num_pull_requests'], '0')
+          inputs:
+            repoType: 'Azure DevOps'
+            repositorySelector: 'select'
+            projectId: '$(System.TeamProjectId)'
+            gitRepositoryId: '$(Build.Repository.ID)'
+            sourceBranch: $(originBranch)
+            targetBranch: $(destinyBranch)
+            title: 'Creacion de Pull Request automatico a $(destinyBranch)'
+            description: 'Se realiza la actualizacion de los cambios sobre la rama $(destinyBranch)'
+            autoComplete: false
+          env:
+            System_AccessToken: $(System.AccessToken)
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    - job: 'pr_commit_api'
+      displayName: 'Searching The PR Commit In API'
+      pool:
+        name: 'hosted-dockerized-linux'
+      steps:
+        - script: |
+            organization_uri=$(System.CollectionUri)
+            project=$(System.TeamProject)
+            repository=$(Build.Repository.Name)	
+            targetRefName='refs/heads/master'
+            url="$organization_uri$project/_apis/git/repositories/$repository/pullrequests?searchCriteria.targetRefName=$targetRefName&api-version=7.0&searchCriteria.status=completed"
+
+            response=$(curl -X GET \
+            --header 'Authorization: Bearer $(System.AccessToken)' $url \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json')
+
+            # Process the response as needed
+            echo "$response"
+
+            last_commit=$(Build.SourceVersion)
+
+            # Find the sourceRefName of the target_commit_id
+            source_ref_name=$(echo "$response" | jq -r --arg target_commit_id "$last_commit" '.value[] | select(.lastMergeCommit.commitId == $target_commit_id) | .sourceRefName')
+
+            echo "Source Ref Name: $source_ref_name"
+
+            if [[ $source_ref_name == *"hotfix"* ]]; then
+              echo "Source Ref Name: $source_ref_name"
+              echo "Match found! The commit is from a hotfix merge."
+              echo "##vso[task.setvariable variable=pr_commit;isOutput=true]$last_commit"
+              echo "##vso[task.setvariable variable=source_branch;isOutput=true]$source_ref_name"
+
+            else
+              echo "The last commit is not from a hotfix PR."
+            fi
+          name: SearchingPRCommit
+    - job: 'pull_request_develop'
+      displayName: 'Create Pull Request To Develop'
+      dependsOn: 
+        - 'pr_commit_api'
+      pool:
+        name: 'Azure Pipelines'
+        VmImage: windows-2022  
+      variables:
+        true_pr: $[ dependencies.pr_commit_api.outputs['SearchingPRCommit.pr_commit'] ]
+        source_name: $[ dependencies.pr_commit_api.outputs['SearchingPRCommit.source_branch'] ]
+      condition: eq(variables['Build.SourceVersion'], variables['true_pr'])
+      steps:
+        - task: CreatePullRequest@1
+          displayName: 'Create Pull Request To Develop'
+          condition: eq(variables['Build.SourceVersion'], variables['true_pr'])
+          inputs:
+            repoType: 'Azure DevOps'
+            repositorySelector: 'select'
+            projectId: '$(System.TeamProjectId)'
+            gitRepositoryId: '$(Build.Repository.ID)'
+            sourceBranch: $(source_name)
+            targetBranch: $(destinyBranch)
+            title: 'Creacion de Pull Request automatico a $(destinyBranch)'
+            description: 'Se realiza la actualizacion de los cambios sobre la rama $(destinyBranch)'
+            autoComplete: true
+            deleteSource: true
+          env:
+            System_AccessToken: $(System.AccessToken)

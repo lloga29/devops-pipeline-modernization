@@ -1,0 +1,19 @@
+jobs:
+  - job: 'architecture_adherence_gradle'
+    displayName: 'Architecture Adherence Automation Test'
+    pool:
+      name: hosted-dockerized-linux
+    
+    steps:
+
+      - checkout: self
+
+      - task: Gradle@2
+        displayName: 'Gradle Integration Test'
+        inputs:
+          gradleWrapperFile: 'gradlew'
+          tasks: 'test --tests *ArchTest*'
+          publishJUnitResults: true
+          jdkVersionOption: 1.11
+          testResultsFiles: '**/TEST-*.xml'
+          testRunTitle: Architecture Results

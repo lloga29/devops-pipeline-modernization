@@ -1,0 +1,45 @@
+  jobs:
+  - job: 'public_interface_tests'
+    displayName: 'Public Interface tests'
+    steps:
+      - checkout: git://$(PublicInterfaceTest)
+      
+      - task: JoeJulik.install-node-and-npm-task.custom-build-release-task.NodeAndNpmTool@1
+        displayName: 'Use Node 10.x'
+
+      - task: Npm@1
+        displayName: 'Install Dependencies'
+        inputs:
+          workingDir: '$(System.DefaultWorkingDirectory)'
+          verbose: false
+
+      - task: Npm@1
+        displayName: 'Public Interface Test'
+        inputs:
+          command: custom
+          workingDir: '$(System.DefaultWorkingDirectory)'
+          verbose: false
+          customCommand: 'run test'
+        continueOnError: true
+
+      - task: Npm@1
+        displayName: 'Generate Report'
+        inputs:
+          command: custom
+          workingDir: '$(System.DefaultWorkingDirectory)'
+          verbose: false
+          customCommand: 'run report'
+        continueOnError: true
+
+
+      - task: benjhuser.ReleaseArtifacts.PublishReleaseArtifact.PublishReleaseArtifact@1
+        displayName: 'Upload Release Artifact'
+        inputs:
+          artifactPath: '$(System.DefaultWorkingDirectory)/report'    
+      
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathToPublish: '$(System.DefaultWorkingDirectory)/report'  
+          artifactName: 'Public-Interface-Test-report' 
+          publishLocation: 'Container'
+         

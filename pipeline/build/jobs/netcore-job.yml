@@ -1,0 +1,121 @@
+jobs:
+  - job: 'build_netcore'
+    dependsOn: 'semantic_version'
+    displayName: 'Build NET Core App'
+    steps:
+      - checkout: self
+
+      - task: replacetokens@3
+        displayName: Replace nugget Tokens
+        inputs:
+          targetFiles: |
+            **/NuGet.config
+
+      - task: SonarQubePrepare@4
+        inputs:
+          SonarQube: 'sonarqube'
+          scannerMode: 'MSBuild'
+          ProjectKey: '$(SonarProjectKey)'
+          ProjectName: '$(SonarProjectName)'
+          ProjectVersion: '$(Build.BuildNumber)'
+          extraProperties: |
+            # Additional properties that will be passed to the scanner, 
+            # Put one key=value per line, example:
+            # sonar.exclusions=**/*.bin
+            sonar.cs.opencover.reportsPaths=**/**/obj/BuildReports/coverage.opencover.xml
+            sonar.test.exclusions=$(ExclusionFolderName)
+            sonar.verbose=true
+
+      - powershell: |
+          $params = "$env:SONARQUBE_SCANNER_PARAMS" -replace '"sonar.branch.name":"[\w,/,-]*"\,?'
+          Write-Host "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$params"
+        displayName: 'Configuración de Sonar para Community edition'
+      
+      - task: UseDotNet@2
+        inputs:
+          packageType: 'sdk'
+          version: '8.x'
+          includePreviewVersions: true
+          performMultiLevelLookup: true
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Clean'
+        inputs:
+          command: custom
+          projects: '**/**/*.csproj'
+          custom: clean
+          arguments: '--configuration  $(BuildConfiguration)'
+
+      - task: DotNetCoreCLI@2
+        displayName: Restore
+        inputs:
+          command: 'restore'
+          projects: '**/**/*.csproj'
+          feedsToUse: 'select'
+          vstsFeed: '1eccc046-a46d-4d01-a61f-22c450d2ce9e'
+
+      - task: DotNetCoreCLI@2
+        displayName: Build
+        inputs:
+          projects: '**/**/*.csproj'
+          arguments: '--configuration $(BuildConfiguration) --force'
+
+      - ${{ if eq(parameters.unitest, true) }}: 
+        - task: UseDotNet@2
+          displayName: update version
+          inputs:
+            packageType: 'sdk'
+            version: '6.x'
+            includePreviewVersions: true
+
+        - task: DotNetCoreCLI@2
+          displayName: 'Unit Tests'
+          inputs:
+            command: test
+            projects: '**/**/*[Uu]nit*[Tt]est*/*.csproj'
+            arguments: '--configuration $(BuildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=obj/BuildReports/'
+            testRunTitle: 'UnitTests Results'
+            
+      - ${{ if eq(parameters['component'], 'true') }}:  
+        - task: DotNetCoreCLI@2
+          displayName: 'Component Tests'
+          inputs:
+            command: test
+            projects: '**/**/*[Cc]omponent*[Tt]est*/*.csproj'
+            testRunTitle: 'ComponentTests Results'
+
+      - task: SonarQubeAnalyze@4
+        displayName: 'Run Code Analysis'
+
+      - task: SonarQubePublish@4
+        displayName: 'Publish Result Static Code Analysis'
+        inputs:
+            pollingTimeoutSec: 400
+
+      - task: sonar-buildbreaker@8
+        displayName: 'Quality Gate'
+        inputs:
+            SonarQube: 'sonarqube'
+      
+      - task: UseDotNet@2
+        displayName: update version
+        inputs:
+          packageType: 'sdk'
+          version: '7.x'
+          includePreviewVersions: true
+        
+      - task: DotNetCoreCLI@2
+        displayName: 'Compile'
+        inputs:
+            command: publish
+            publishWebProjects: false
+            projects: '**/**/*.csproj'
+            arguments: '--output publish'
+            zipAfterPublish: false
+            modifyOutputPath: false
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Artifact'
+        inputs:
+            PathtoPublish: 'publish'
+            ArtifactName: 'Artifact-$(Build.Repository.Name)'

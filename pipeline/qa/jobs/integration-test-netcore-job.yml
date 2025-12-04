@@ -1,0 +1,69 @@
+jobs:
+  - job: 'integration_test_netcore'
+    displayName: 'Integration Tests Netcore'
+    pool:
+      name: hosted-dockerized-linux
+    
+    steps:
+      - checkout: self
+
+      - task: replacetokens@3
+        displayName: Replace nugget Tokens
+        inputs:
+          targetFiles: |
+            **/NuGet.config 
+      
+      - task: Bash@3
+        inputs:
+          targetType: 'inline'
+          script: 'cat **/NuGet.config'
+          
+      - task: DotNetCoreCLI@2
+        displayName: Clean
+        inputs:
+          command: custom
+          projects: '**/**/*.csproj'
+          custom: clean
+          arguments: '--configuration  $(BuildConfiguration)'
+                  
+      - task: DotNetCoreCLI@2
+        displayName: Restore
+        inputs:
+          command: 'restore'
+          projects: '**/**/*.csproj'
+          feedsToUse: 'select'
+          vstsFeed: '1eccc046-a46d-4d01-a61f-22c450d2ce9e'
+
+      - task: DotNetCoreCLI@2
+        displayName: Build
+        inputs:
+          projects: '**/**/*.csproj'
+          arguments: '--configuration $(BuildConfiguration) --force'
+          workingDirectory: '$(System.DefaultWorkingDirectory)'
+          
+      - ${{ if eq(parameters.integration, true) }}: 
+        - task: DotNetCoreCLI@2
+          displayName: 'Integration Test'
+          inputs:
+            command: test
+            projects: '**/**/*[Ii]nt*[Tt]est*/*.csproj'
+            testRunTitle: 'IntegrationTest Results'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+      - ${{ if eq(parameters.contractconsumer, true) }}:    
+        - task: DotNetCoreCLI@2
+          displayName: 'Consumer Contract Test'
+          inputs:
+            command: test
+            projects: '**/**/*[Cc]ontract*[Cc]onsumer*[Tt]est*/*.csproj'
+            testRunTitle: 'ConsumerContractTest Results'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+      - ${{ if eq(parameters.contractprovider, true) }}:    
+        - task: DotNetCoreCLI@2
+          displayName: 'Contract Provider Test'
+          inputs:
+            command: test
+            projects: '**/**/*[Cc]ontract*[Pp]rovider*[Tt]est*/*.csproj'
+            testRunTitle: 'ProviderContractTest Results'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'

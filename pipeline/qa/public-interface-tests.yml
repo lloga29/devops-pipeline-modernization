@@ -1,0 +1,9 @@
+stages:
+- stage: 'public_interface_tests'
+  displayName: 'Public Interface Tests'
+  dependsOn:  'ecosystem_integration'
+  condition: in(dependencies.ecosystem_integration.result, 'Succeeded', 'SucceededWithIssues')
+  pool:
+    name: hosted-dockerized-linux
+  jobs:  
+  - template: jobs/public-interface-test-job.yml

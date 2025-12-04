@@ -1,0 +1,58 @@
+jobs:
+- job: 'semantic_version'
+  displayName: 'Semantic Version'
+  pool:
+    name: hosted-dockerized-linux
+
+
+
+  steps:
+  - checkout: self
+    fetchDepth: 0
+  #- checkout: git://DevOps/pipeline-templates@feature/flujo-hotfix
+  - checkout: git://DevOps/pipeline-templates
+
+
+  - task: gitversion/setup@0
+    displayName: Install GitVersion
+    inputs:
+      versionSpec: '5.10.0'
+
+  - task: gitversion/execute@0
+    displayName: 'Generate Semantic Version'
+    inputs:
+      useConfigFile: true
+      configFilePath: '$(System.DefaultWorkingDirectory)/pipeline-templates/pipeline/general/GitVersion.yml'
+      targetPath: '$(Build.SourcesDirectory)/$(Build.Repository.Name)'
+
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix') }}:
+    - script: |
+        cd $(Build.SourcesDirectory)/$(Build.Repository.Name)
+
+        last_merge_commit=$(git rev-list --merges -n 1 hotfix/$(Build.SourceBranchName))
+        # The git rev-list command with the --merges option filters the commit history to include only merge commits. 
+        # The -n 1 flag limits the output to the latest (most recent) merge commit.
+
+        found=false
+
+        master_commits=$(git rev-list master)
+
+        echo $last_merge_commit
+
+        # Iterate through each commit in the master branch
+        for commit in $master_commits; do
+          # Check if the commit matches the last merge commit in hotfix
+          if [ "$commit" = "$last_merge_commit" ]; then
+            found=true
+            echo "The last merge commit in hotfix matchs a commit in master. Hotfix was created from master"
+            break
+          fi
+        done
+
+        if [ "$found" != true ]; then
+          echo "Error: The last merge commit in 'hotfix' does not match any commit in 'master'. Hotfix branch was not created from master"
+          exit 1
+        fi
+
+        exit 0
+      name: VerifyngHotfixSource

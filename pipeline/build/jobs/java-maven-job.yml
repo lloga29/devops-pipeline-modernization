@@ -1,0 +1,81 @@
+jobs:
+  - job: 'build_java'
+    dependsOn: 'semantic_version'
+    displayName: 'Build Java App'    
+    pool:
+        name: 'hosted-dockerized-linux'
+        demands: maven
+    variables:
+    - template: ../../variables.yml
+    steps:
+          
+      - task: replacetokens@3
+        displayName: 'Replace Tokens **/VersionController'
+        inputs:
+            targetFiles: '**/VersionController*'
+
+      - task: SonarQubePrepare@5
+        displayName: 'Configure Static Code Analysis'
+        inputs:
+            SonarQube: 'sonarqube'
+            scannerMode: 'Other'
+
+      - powershell: |
+          Write-Output $env:SONARQUBE_SCANNER_PARAMS
+          $params = "$env:SONARQUBE_SCANNER_PARAMS" -replace '"sonar.branch.name":"[\w,/,-]*"\,?'
+          Write-Host "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$params"
+          Write-Output $params
+        displayName: 'Configuración de Sonar para Community edition'
+
+      - task: JavaToolInstaller@0
+        displayName: 'Definir versión Java en agente Docker'
+        condition: startsWith(variables['Agent.Name'], 'deploy')
+        inputs:
+          versionSpec: '${{ parameters.javaversion }}'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'PreInstalled'
+
+      - task: Maven@3
+        displayName: 'Maven Build'
+        inputs:
+          mavenPomFile: 'pom.xml'
+          javaHomeOption: 'JDKVersion'
+          mavenVersionOption: 'Default'
+          mavenAuthenticateFeed: false
+          effectivePomSkip: false
+          sqMavenPluginVersionChoice: 'latest'
+          sonarQubeRunAnalysis: false
+          options: 'install -DskipTests=true'
+
+      - ${{ if eq(parameters.unitest, true) }}: 
+        - task: Maven@3
+          displayName: 'Maven Test'
+          inputs:
+            mavenPomFile: 'pom.xml'
+            publishJUnitResults: true
+            testResultsFiles: '**/TEST-*.xml'
+            codeCoverageToolOption: 'JaCoCo'
+            javaHomeOption: 'JDKVersion'
+            mavenVersionOption: 'Default'
+            mavenAuthenticateFeed: false
+            effectivePomSkip: false
+            sonarQubeRunAnalysis: true
+            sqMavenPluginVersionChoice: 'latest'
+            options: 'surefire:test'
+
+      - task: SonarQubePublish@4
+        displayName: 'Publish Result Static Code Analysis'
+        inputs:
+            pollingTimeoutSec: 400
+
+      - task: sonar-buildbreaker@8
+        displayName: 'Quality Gate'
+        inputs:
+            SonarQube: 'sonarqube'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Artifact'
+        inputs:
+            PathtoPublish: 'target/'
+            ArtifactName: 'Artifact-$(Build.Repository.Name)'
+

@@ -1,0 +1,14 @@
+variables:
+
+    DevAcr             : 'acrintegration.azurecr.io'
+    DevAcrSubscription : 'acrintegration'
+    ImageVersion       : '$(Build.BuildNumber)'
+    PdnAcr             : 'acrsatrack.azurecr.io'
+    PdnAcrSubscription : 'acrproduction'
+    QaAcr              : 'testregistrocontenedores.azurecr.io' 
+    QaAcrSubscription  : 'acrtest'
+    Cluster            : 'Aks-Tracking-Platform'
+    Environment        : 'pdn'
+    ResourceGroup      : 'GRP_Tracking_Platform'
+    Subscription       : 'akspdn-tracking-platform'
+    TagNumber          : $[stageDependencies.artifacts_managment.semantic_version.outputs['setvariablebuild.TagNumber'] ]  

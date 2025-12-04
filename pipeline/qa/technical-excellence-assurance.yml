@@ -1,0 +1,24 @@
+stages:
+- stage: 'technical_excellence_assurance'
+  displayName: 'Technical Excellence Assurance'
+
+  ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop') , in(parameters.language, 'netcore')) }}: 
+    dependsOn: []
+
+  ${{ if and(or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), startsWith(variables['Build.SourceBranch'], 'refs/tags/')) , in(parameters.language, 'java')) }}: 
+    dependsOn:
+      - 'development_integration'
+    condition: in(dependencies.development_integration.result, 'Succeeded', 'SucceededWithIssues')
+
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}: 
+    dependsOn: []
+
+  jobs:
+  - ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop') , eq(parameters.build, 'msbuild') )  }}:      
+    - template: jobs/arch-test-netcore-job.yml
+
+  - ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop') , eq(parameters.build, 'gradle'))  }}:      
+    - template: jobs/arch-test-gradle-job.yml
+
+  - ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop') , eq(parameters.build, 'maven'))  }}:      
+    - template: jobs/arch-test-maven-job.yml 

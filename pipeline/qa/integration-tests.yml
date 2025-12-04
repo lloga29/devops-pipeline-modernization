@@ -1,0 +1,29 @@
+stages:
+- stage: 'integration_tests'
+  displayName: 'Integration Tests'
+  pool:
+    name: hosted-dockerized-linux
+  dependsOn:  'ecosystem_integration'
+  condition: in(dependencies.ecosystem_integration.result, 'Succeeded', 'SucceededWithIssues')
+
+  jobs:
+  - ${{ if eq(parameters.language, 'netcore') }}:
+    - template: jobs/integration-test-netcore-job.yml
+      parameters:
+        contractconsumer: ${{parameters.contractconsumer}}
+        integration: ${{parameters.integration}}
+        contractprovider: ${{parameters.contractprovider}}
+
+  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'maven')) }}:
+    - template: jobs/integration-test-maven-job.yml
+      parameters:
+        contractconsumer: ${{parameters.contractconsumer}}
+        integration: ${{parameters.integration}}
+        contractprovider: ${{parameters.contractprovider}}
+    
+  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'gradle')) }}:
+    - template: jobs/integration-test-gradle-job.yml
+      parameters:
+        contractconsumer: ${{parameters.contractconsumer}}
+        integration: ${{parameters.integration}}
+        contractprovider: ${{parameters.contractprovider}}

@@ -1,0 +1,153 @@
+  jobs:
+  - deployment: 'release_aks'
+
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      environment: Integration-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Integration'
+      variables:
+      - template: ../../SatrackVars.yml
+        
+
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+      environment: Release-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Release'
+      variables:
+      - template: ../../SatrackVars.yml
+
+    ${{ if and(eq(parameters['masteraks'], 'AksSatrackBigData'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-Bigdata.yml
+
+    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-tracking.yml
+    
+    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform2'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-tracking2.yml
+
+    
+    ${{ if and(eq(parameters['masteraks'], 'AksSatrack3'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-aks3.yml
+        
+    
+    ${{ if and(eq(parameters['masteraks'], 'aks-products'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-products.yml
+    
+    ${{ if and(eq(parameters['masteraks'], 'Aks-app-integrations'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production'
+      variables:
+      - template: ../../SatrackVars-app.yml 
+    
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+      environment: Production-$(EnvironmentTag)
+      displayName: 'Deploy App Kubernetes - Production - Atp'
+      variables:
+      - template: ../../SatrackVars.yml
+    
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: none
+          - checkout: self
+            fetchDepth: 1
+          
+          - task: replacetokens@3
+            displayName: 'Replace Tokens'
+            inputs:
+              targetFiles: 'deploy/deploy-$(Environment).yml'
+
+          - bash: 'cat deploy/deploy-$(Environment).yml'
+            displayName: 'Print deploy.yml'
+
+          - bash: 'echo $(Environment) && echo ${{ parameters.masteraks }} && echo ${{ parameters.type }} && echo $(Cluster) && echo $(ResourceGroup) && echo $(Subscription)'
+          
+          - task: Kubernetes@1
+            displayName: 'Delete old containers'
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: ${{variables.Subscription}}
+              azureResourceGroup: $(ResourceGroup)
+              kubernetesCluster: $(Cluster)
+              namespace: $(NameSpace)
+              command: delete
+              arguments: 'deployment $(ImageName) --ignore-not-found'
+
+          - task: Kubernetes@1
+            displayName: 'Deploy container'
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: ${{variables.Subscription}}
+              azureResourceGroup: $(ResourceGroup)
+              kubernetesCluster: $(Cluster)
+              namespace: $(NameSpace)
+              command: apply
+              arguments: '-f deploy/deploy-$(Environment).yml'
+
+          - task: Kubernetes@1
+            displayName: 'Check Deploy'
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: ${{variables.Subscription}}
+              azureResourceGroup: $(ResourceGroup)
+              kubernetesCluster: $(Cluster)
+              namespace: $(NameSpace)
+              command: get
+              arguments: 'pods -n $(NameSpace)'
+
+          ##- task: AzureCLI@2
+          ##  name: podStatus
+          ##  displayName: AKS credentials
+          ##  inputs:
+          ##    azureSubscription: ${{variables.Subscription}}
+          ##    scriptType: bash
+          ##    scriptLocation: inlineScript
+          ##    inlineScript: |
+          ##      az aks get-credentials --resource-group $(ResourceGroup) --name $(Cluster) --overwrite-existing
+          ##      # while [[ $(kubectl get pods --namespace $(NameSpace) | grep $(Build.BuildRepositoryName) | awk 'NR==1{print $3}') != "Running" ]]; do echo "waiting for pod" && sleep 5; done
+          ##      # while [[ $(kubectl get service --namespace $(NameSpace) | grep frontend | awk 'NR==1{print $3}') = "<pending>" ]]; do echo "waiting for pod" && sleep 5; done
+          ##      kubectl get pods --namespace $(NameSpace)
+          ##      #kubectl describe pods --namespace $(NameSpace) delivery-management-route-manager-test-cc885c698-dtbw9 
+          ##      #kubectl describe pods --namespace $(NameSpace)
+          ##      kubectl get service --namespace $(NameSpace)
+          ##      kubectl get deploy --namespace $(NameSpace)
+
+          # - task: Kubernetes@1
+          #   displayName: 'kubectl apply Ingress'
+          #   inputs:
+          #     connectionType: 'Azure Resource Manager'
+          #     azureSubscriptionEndpoint: $(subscription)
+          #     azureResourceGroup: $(resourcegroup)
+          #     kubernetesCluster: $(cluster)
+          #     namespace: $(namespace)
+          #     command: apply
+          #     arguments: '-f deploy/ingress.yml'
+
+          # - task: CmdLine@2
+          #   displayName: 'Check Deploy'
+          #   inputs:
+          #     script: |
+          #       az login --username $(username) --password $(password)
+          #       az aks get-credentials --resource-group $(aks.resource.group) --name $(aks.name)
+                  
+          #       kubectl apply -f deployment.yml
+          #       echo $(stage)-$(image.name):$$(Build.BuildNumber) $(acr)/$(stage)-$(image.name):$(Build.BuildNumber)
+          #       kubectl -n $(stage)-$(domain) describe deployment $(stage)-$(image.name)
+                  
+          #       while [[ $(kubectl -n $(stage)-$(domain) get pods -l app=$(stage)-$(image.name) -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do echo "waiting for pod" && sleep 1; done  
+          #   timeoutInMinutes: 3

@@ -1,0 +1,43 @@
+variables:
+
+  DevAcr             : 'acrintegration.azurecr.io'
+  DevAcrSubscription : 'acrintegration'
+  ImageVersion       : '$(Build.BuildNumber)'
+  PdnAcr             : 'acrsatrack.azurecr.io'
+  PdnAcrSubscription : 'acrproduction'
+  QaAcr              : 'testregistrocontenedores.azurecr.io' 
+  QaAcrSubscription  : 'acrtest'
+
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+
+    Cluster            : 'AKSIntegrationNew'
+    Environment        : 'dev'
+    Location           : 'East US'
+    ResourceGroup      : 'GRPIntegrationNew'
+    StorageAccountName : 'devdmstoroutev2'
+    Subscription       : 'aksintegration2' 
+    TagNumber: $[stageDependencies.development_integration.semantic_version.outputs['setvariablebuild.TagNumber'] ] 
+
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+
+    Cluster            : 'akssatracktestgi'
+    Environment        : 'test'
+    Location           : 'East US 2'
+    ResourceGroup      : 'GRPtestgi'
+    StorageAccountName : 'testdmstoroutev2'
+    Subscription       : 'akssatracktestgi'
+    TagNumber: $[stageDependencies.artifacts_managment.semantic_version.outputs['setvariablebuild.TagNumber'] ]  
+
+  ##${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+##
+  ##  Cluster            : 'AksSatrack3'
+  ##  Environment        : 'pdn'
+  ##  ResourceGroup      : 'GRPAKSv3'
+  ##  Subscription       : 'aksproduction'
+##
+  ##${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+##
+  ##  Cluster            : 'Aks-Tracking-Platform'
+  ##  Environment        : 'pdn'
+  ##  ResourceGroup      : 'GRP_Tracking_Platform'
+  ##  Subscription       : 'akspdn-tracking-platform'

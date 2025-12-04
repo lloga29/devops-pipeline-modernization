@@ -1,0 +1,111 @@
+jobs:
+  - job: 'build_java'
+    dependsOn: 'semantic_version'
+    displayName: 'Build Java App'    
+    pool:
+        name: hosted-dockerized-linux
+        #demands: maven
+    variables:
+      - template: ../../variables.yml
+    steps:
+      - task: replacetokens@3
+        displayName: 'Replace Tokens build.gradle'
+        inputs:
+            targetFiles: '**/build.gradle'
+
+      - task: SonarQubePrepare@4
+        displayName: 'Configure Static Code Analysis'
+        inputs:
+            SonarQube: 'sonarqube'
+            scannerMode: Other
+            extraProperties: |
+              # Additional properties that will be passed to the scanner, 
+              # Put one key=value per line, example:
+              # sonar.exclusions=**/*.bin
+              
+      - powershell: |
+          Write-Output $env:SONARQUBE_SCANNER_PARAMS
+          $params = "$env:SONARQUBE_SCANNER_PARAMS" -replace '"sonar.branch.name":"[\w,/,-]*"\,?'
+          Write-Host "##vso[task.setvariable variable=SONARQUBE_SCANNER_PARAMS]$params"
+          Write-Output $params
+        displayName: 'Configuración de Sonar para Community edition'
+      
+      - task: JavaToolInstaller@0
+        displayName: 'Definnir versión Java en VM-Agent'
+        condition: startsWith(variables['Agent.Name'], 'vsts')
+        inputs:
+          versionSpec: '17'
+          jdkArchitectureOption: 'x64'
+          jdkSourceOption: 'LocalDirectory'
+          jdkFile: '/opt/openjdk-17.0.2_linux-x64_bin.tar.gz'
+          jdkDestinationDirectory: '/tmp/'
+          cleanDestinationDirectory: true
+
+      ##- task: JavaToolInstaller@0
+      ##  displayName: 'Definir versión Java en agente Docker'
+      ##  condition: startsWith(variables['Agent.Name'], 'deploy')
+      ##  inputs:
+      ##    versionSpec: '${{ parameters.javaversion }}'
+      ##    jdkArchitectureOption: 'x64'
+      ##    jdkSourceOption: 'PreInstalled'
+
+      - task: Gradle@2
+        displayName: 'Gradle Compile'
+        inputs:
+          gradleWrapperFile: 'gradlew'
+          tasks: 'build -x test'
+          publishJUnitResults: false
+          javaHomeOption: 'JDKVersion'
+          sonarQubeRunAnalysis: false
+          spotBugsAnalysis: false
+        env:
+          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      - ${{ if eq(parameters.unitest, true) }}: 
+        - task: Gradle@2
+          displayName: 'Gradle Test'
+          inputs:
+            gradleWrapperFile: 'gradlew'
+            tasks: 'build test'
+            publishJUnitResults: true
+            testResultsFiles: '**/TEST-*.xml'
+            testRunTitle: 'UnitTests Results'
+            javaHomeOption: 'JDKVersion'
+            sonarQubeRunAnalysis: true
+            sqGradlePluginVersionChoice: 'build'
+            spotBugsAnalysis: false
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      - task: SonarQubePublish@4
+        displayName: 'Static Code Analysis'
+        inputs:
+            pollingTimeoutSec: 400
+
+      - task: sonar-buildbreaker@8
+        displayName: 'Quality Gate'
+        inputs:
+            SonarQube: 'sonarqube'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Artifact'
+        inputs:
+            PathtoPublish: 'applications/app-service/build/libs/'
+            ArtifactName: 'Artifact-$(Build.Repository.Name)'
+
+      ##- task: PublishBuildArtifacts@1
+      ##  inputs:
+      ##    PathtoPublish: 'charts'
+      ##    ArtifactName: 'drop'
+      ##    publishLocation: 'Container'
+      ##  continueOnError: true  
+
+      ##- task: Gradle@2
+      ##  inputs:
+      ##    gradleWrapperFile: 'gradlew'
+      ##    tasks: 'publish'
+      ##    publishJUnitResults: false
+      ##    javaHomeOption: 'JDKVersion'
+      ##    sonarQubeRunAnalysis: false
+      ##    spotBugsAnalysis: false
+              

@@ -1,0 +1,31 @@
+stages:
+- stage: 'development_integration'
+  
+  pool:
+    name: 'hosted-dockerized-linux'
+  displayName: Development Integration
+  dependsOn: [] 
+  jobs:
+  - template: ../general/semantic-version-job.yml
+  - ${{ if eq(parameters.language, 'netcore') }}:
+    - template: jobs/netcore-job.yml
+      parameters:
+        type: ${{ parameters.type }}
+        agent: ${{ parameters.agent }}
+        unitest: ${{ parameters.unitest }} 
+        component: ${{ parameters['component'] }} 
+
+  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'gradle')) }}:
+    - template: jobs/java-gradle-job.yml
+      parameters:
+        type: ${{ parameters.type }}
+        artifact : ${{ parameters.artifact }} 
+        unitest: ${{ parameters.unitest }} 
+        javaversion: ${{ parameters['javaversion'] }}
+
+  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'maven')) }}:
+    - template: jobs/java-maven-job.yml
+      parameters:
+        type: ${{ parameters.type }}
+        unitest: ${{ parameters.unitest }} 
+        javaversion: ${{ parameters['javaversion'] }}

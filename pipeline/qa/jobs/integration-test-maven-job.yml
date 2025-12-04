@@ -1,0 +1,53 @@
+jobs:
+  - job: 'integration_test_maven'
+    displayName: 'Integration Tests Maven'
+    pool:
+      name: hosted-dockerized-linux
+    
+    steps:
+      - checkout: self
+
+      - ${{ if eq(parameters.integration, true) }}: 
+        - task: Maven@3
+          displayName: 'Maven Integration Test'
+          inputs:
+            mavenPomFile: 'pom.xml'
+            publishJUnitResults: true
+            testResultsFiles: '**/TEST-*.xml'
+            javaHomeOption: 'JDKVersion'
+            mavenVersionOption: Path
+            mavenDirectory: '/opt/apache-maven-3.3.9'
+            mavenAuthenticateFeed: false
+            effectivePomSkip: false
+            sqMavenPluginVersionChoice: 'latest'
+            options: 'test -Dtest=*IntegrationTest*'
+
+      - ${{ if eq(parameters.contractconsumer, true) }}:    
+        - task: Maven@3
+          displayName: 'Maven Contract Consumer Test'
+          inputs:
+            mavenPomFile: 'pom.xml'
+            publishJUnitResults: true
+            testResultsFiles: '**/TEST-*.xml'
+            javaHomeOption: 'JDKVersion'
+            mavenVersionOption: Path
+            mavenDirectory: '/opt/apache-maven-3.3.9'
+            mavenAuthenticateFeed: false
+            effectivePomSkip: false
+            sqMavenPluginVersionChoice: 'latest'
+            options: 'test -Dtest=*ContractConsumerTest*'
+
+      - ${{ if eq(parameters.contractprovider, true) }}:    
+        - task: Maven@3
+          displayName: 'Maven Contract Provider Test'
+          inputs:
+            mavenPomFile: 'pom.xml'
+            publishJUnitResults: true
+            testResultsFiles: '**/TEST-*.xml'
+            javaHomeOption: 'JDKVersion'
+            mavenVersionOption: Path
+            mavenDirectory: '/opt/apache-maven-3.3.9'
+            mavenAuthenticateFeed: false
+            effectivePomSkip: false
+            sqMavenPluginVersionChoice: 'latest'
+            options: 'test -Dtest=*ContractProviderTest*'

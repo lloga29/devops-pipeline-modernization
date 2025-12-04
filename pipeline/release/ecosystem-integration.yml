@@ -1,0 +1,26 @@
+stages:
+
+- stage: 'ecosystem_integration'
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    displayName: 'Ecosystem Integration Development'
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+    displayName: 'Ecosystem Integration Release'
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+    displayName: 'Ecosystem Integration Production Atp'
+  ${{ if or(in(variables['Build.SourceBranch'], 'refs/heads/master' , 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/')) }}:
+    displayName: 'Ecosystem Integration Production'
+
+  dependsOn: 
+    - 'artifacts_managment'
+    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      - 'development_integration'
+  condition:
+    in(dependencies.artifacts_managment.result, 'Succeeded', 'SucceededWithIssues')
+  pool:
+    name: hosted-dockerized-linux
+
+  jobs:
+    - template: jobs/kubernetes-deploy-jobs.yml
+      parameters:      
+        masteraks: ${{ parameters.masteraks }}
+    - template: jobs/Update-tag.yml
