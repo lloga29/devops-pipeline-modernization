@@ -1,0 +1,56 @@
+parameters:
+  - name: type
+    type: string
+    default: api
+  - name: unitest
+    type: boolean
+    default: true
+  - name: component
+    type: boolean
+    default: false
+
+jobs:
+  - job: build_python
+    displayName: 'Build Python app'
+    pool:
+      vmImage: 'ubuntu-latest'
+
+    steps:
+      - checkout: self
+
+      - task: UsePythonVersion@0
+        displayName: 'Select Python 3.x'
+        inputs:
+          versionSpec: '3.x'
+
+
+      - script: |
+          if [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt not found, skipping dependencies install"
+          fi
+        displayName: 'Install dependencies (optional)'
+
+
+      - ${{ if eq(parameters.unitest, true) }}:
+        - script: |
+            if command -v pytest >/dev/null 2>&1; then
+              pytest
+            else
+              echo "pytest not installed, skipping tests"
+            fi
+          displayName: 'Run unit tests (basic)'
+
+
+      - script: |
+          mkdir -p dist
+          cp -r . dist/
+        displayName: 'Package app (basic)'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish artifact'
+        inputs:
+          PathtoPublish: 'dist'
+          ArtifactName: 'python-app'

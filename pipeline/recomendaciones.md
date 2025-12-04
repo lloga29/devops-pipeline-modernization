@@ -20,3 +20,19 @@ Se recomienda evolucionar el pipeline incluyendo:
 3. Compliance Testing
 4. Pull request automáticos.
 5. Rollback y pruebas de humo.
+
+
+### Modelo de stacks para el pipeline de build (3.1)
+
+El template principal `pipeline/main.yml` expone un parámetro `stack` que representa el stack tecnológico completo (lenguaje + tipo de build). En lugar de seguir añadiendo condiciones `if` por lenguaje, el pipeline delega en un router de build (`pipeline/build/development-integration.yml`) que invoca dinámicamente `jobs/<stack>-job.yml`.
+
+Stacks soportados:
+- `netcore` → `jobs/netcore-job.yml`
+- `java-gradle` → `jobs/java-gradle-job.yml`
+- `java-maven` → `jobs/java-maven-job.yml`
+- `python` → `jobs/python-job.yml`
+- `angular` → `jobs/angular-job.yml`
+
+Para añadir un nuevo stack, basta con:
+1. Agregar el nuevo valor en `parameters.stack.values` en `pipeline/main.yml`.
+2. Crear el archivo `pipeline/build/jobs/<stack>-job.yml` con la lógica de build y tests correspondiente.
