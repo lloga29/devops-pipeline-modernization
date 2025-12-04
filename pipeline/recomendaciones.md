@@ -36,3 +36,23 @@ Stacks soportados:
 Para añadir un nuevo stack, basta con:
 1. Agregar el nuevo valor en `parameters.stack.values` en `pipeline/main.yml`.
 2. Crear el archivo `pipeline/build/jobs/<stack>-job.yml` con la lógica de build y tests correspondiente.
+
+### 3.2 Seguridad y quality gates integrados en el pipeline
+
+El stage de **Technical Excellence** se amplía con un job de seguridad y quality gates, definido en `pipeline/qa/jobs/security-quality-gates-job.yml` y conectado desde `pipeline/qa/technical-excellence-assurance.yml`.
+
+Este job ejecuta tres pasos conceptuales:
+
+1. **Secret scanning (placeholder)**  
+   Tras el checkout del repositorio, se ejecutaría una herramienta tipo `gitleaks` o `trufflehog` para detectar credenciales expuestas.  
+   En una implementación real, cualquier secreto encontrado haría fallar el pipeline (`exit 1`).
+
+2. **SAST / SonarQube (placeholder)**  
+   Se ejecutaría el análisis estático con SonarQube (o equivalente) para el stack correspondiente y se verificaría el *quality gate*.  
+   Si el quality gate es `FAILED` o la cobertura está por debajo de `min_coverage_threshold`, el pipeline se marca como `FAILED`.
+
+3. **Escaneo de vulnerabilidades (Trivy filesystem, placeholder)**  
+   Se lanzaría un escaneo de vulnerabilidades sobre el código/artefactos con `trivy fs`.  
+   La variable `fail_on_critical_vulns` controla si el pipeline debe romperse en presencia de vulnerabilidades `CRITICAL`.
+
+Las variables relacionadas se declaran en `pipeline/variables.yml` (`enable_security_scans`, `fail_on_critical_vulns`, `min_coverage_threshold`, `sonar_*`, `trivy_image`) y permiten activar o desactivar este stage de forma progresiva sin afectar a los equipos que aún no han adoptado el modelo extendido.
