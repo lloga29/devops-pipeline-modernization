@@ -1,0 +1,52 @@
+parameters:
+  - name: type
+    type: string
+    default: api
+  - name: unitest
+    type: boolean
+    default: true
+  - name: component
+    type: boolean
+    default: false
+
+jobs:
+  - job: build_angular
+    displayName: 'Build Angular app'
+    pool:
+      vmImage: 'ubuntu-latest'
+
+    steps:
+      - checkout: self
+
+      - task: NodeTool@0
+        displayName: 'Use Node 18.x'
+        inputs:
+          versionSpec: '18.x'
+
+      - script: |
+          npm ci
+        displayName: 'Install dependencies'
+
+
+      - ${{ if eq(parameters.unitest, true) }}:
+        - script: |
+            if npm run | grep -q "test"; then
+              npm test -- --watch=false
+            else
+              echo "No test script defined in package.json, skipping tests"
+            fi
+          displayName: 'Run unit tests (basic)'
+
+      - script: |
+          if npm run | grep -q "build"; then
+            npm run build -- --configuration=production
+          else
+            echo "No build script defined in package.json, skipping build"
+          fi
+        displayName: 'Build Angular app (basic)'
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish artifact'
+        inputs:
+          PathtoPublish: 'dist'
+          ArtifactName: 'angular-app'

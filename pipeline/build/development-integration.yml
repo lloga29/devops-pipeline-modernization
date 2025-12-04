@@ -1,31 +1,57 @@
+parameters:
+  - name: stack
+    type: string
+    default: netcore
+    values:
+    - netcore
+    - java-gradle
+    - java-maven
+    - python
+    - angular
+
+  - name: type
+    type: string
+    default: api
+    values:
+    - api
+    - worker
+    - cronjob
+
+  - name: agent
+    type: string
+    default: 'hosted-dockerized-linux'
+
+  - name: unitest
+    type: boolean
+    default: true
+
+  - name: component
+    type: boolean
+    default: false
+
+  - name: artifact
+    type: string
+    default: ''
+
+  - name: javaversion
+    type: string
+    default: '11'
+
 stages:
 - stage: 'development_integration'
-  
-  pool:
-    name: 'hosted-dockerized-linux'
   displayName: Development Integration
-  dependsOn: [] 
+  pool:
+    name: ${{ parameters.agent }}
+  dependsOn: []
   jobs:
-  - template: ../general/semantic-version-job.yml
-  - ${{ if eq(parameters.language, 'netcore') }}:
-    - template: jobs/netcore-job.yml
-      parameters:
-        type: ${{ parameters.type }}
-        agent: ${{ parameters.agent }}
-        unitest: ${{ parameters.unitest }} 
-        component: ${{ parameters['component'] }} 
+    # Versionado semántico (se mantiene igual)
+    - template: ../general/semantic-version-job.yml
 
-  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'gradle')) }}:
-    - template: jobs/java-gradle-job.yml
+    # Router único por stack: jobs/<stack>-job.yml
+    - template: jobs/${{ parameters.stack }}-job.yml
       parameters:
         type: ${{ parameters.type }}
-        artifact : ${{ parameters.artifact }} 
-        unitest: ${{ parameters.unitest }} 
-        javaversion: ${{ parameters['javaversion'] }}
-
-  - ${{ if and(eq(parameters.language, 'java'), eq(parameters.build, 'maven')) }}:
-    - template: jobs/java-maven-job.yml
-      parameters:
-        type: ${{ parameters.type }}
-        unitest: ${{ parameters.unitest }} 
-        javaversion: ${{ parameters['javaversion'] }}
+        unitest: ${{ parameters.unitest }}
+        component: ${{ parameters.component }}
+        artifact: ${{ parameters.artifact }}
+        javaversion: ${{ parameters.javaversion }}

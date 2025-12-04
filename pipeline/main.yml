@@ -15,6 +15,17 @@ parameters:
     - netcore
     - java
 
+  - name: stack
+    displayName: 'Technology stack'
+    type: string
+    default: netcore
+    values:
+    - netcore        # .NET Core
+    - java-maven     # Java + Maven
+    - java-gradle    # Java + Gradle
+    - python         # Python
+    - angular        # Angular
+
   - name: build
     type: string
     default: gradle
@@ -126,6 +137,7 @@ stages:
   - ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/heads/feature'), eq(variables['Build.SourceBranch'], 'refs/heads/develop'), startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix')) }}:
     - template: build/development-integration.yml
       parameters:
+        stack: ${{ parameters.stack }}
         language: ${{ parameters.language }}
         build: ${{ parameters.build }}
         type: ${{ parameters.type }} 
