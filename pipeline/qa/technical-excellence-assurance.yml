@@ -22,3 +22,10 @@ stages:
 
   - ${{ if and(eq(variables['Build.SourceBranch'], 'refs/heads/develop') , eq(parameters.build, 'maven'))  }}:      
     - template: jobs/arch-test-maven-job.yml 
+
+  # Nuevo job de seguridad y quality gates (3.2)
+  - ${{ if eq(variables['enable_security_scans'], 'true') }}:
+    - template: jobs/security-quality-gates-job.yml
+      parameters:
+        enableSecurityScans: true
+        failOnCriticalVulns: ${{ eq(variables['fail_on_critical_vulns'], 'true') }}
