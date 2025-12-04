@@ -1,0 +1,49 @@
+# Configuración para ambiente de QA
+
+environment: qa
+
+replicaCount: 2
+
+image:
+  repository: your-registry/your-app
+  tag: 0.1.0-qa
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  hosts:
+    - host: app-qa.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: app-qa-tls
+      hosts:
+        - app-qa.example.com
+
+service:
+  type: ClusterIP
+  port: 80
+
+env:
+  - name: ENVIRONMENT
+    value: "qa"
+  - name: LOG_LEVEL
+    value: "info"
