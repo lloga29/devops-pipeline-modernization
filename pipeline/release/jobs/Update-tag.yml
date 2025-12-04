@@ -49,58 +49,110 @@
       - template: ../../SatrackVars.yml
 
 
+  # =========================
+  # Steps: ya no retagean/pushean imágenes,
+  # ahora actualizan los values GitOps por entorno
+  # =========================
     steps:
-    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:                     
-          - task: Docker@0
-            displayName: 'Pull Development Container Image'
-            inputs:
-                azureSubscription: ${{ variables.DevAcrSubscription }}
-                azureContainerRegistry: $(DevAcr)
-                action: 'Run a Docker command'
-                customCommand: 'pull $(DevAcr)/$(ImageName):$(Build.BuildNumber)'
+    - checkout: self
+      displayName: 'Checkout repo (app + gitops)'
 
-          - task: Docker@1
-            displayName: 'Tag Container Image Develop'
-            inputs:
-                azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
-                azureContainerRegistry: $(DevAcr)
-                command: 'Tag image'
-                arguments: '$(DevAcr)/$(ImageName):dev-latest'
-                imageName: '$(DevAcr)/$(ImageName):$(Build.BuildNumber)'
+    # --- DEV: rama develop → gitops/envs/dev/values-dev.yaml ---
+    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      - script: |
+          echo "=== GitOps: updating image tag for DEV ==="
 
-        
-          - task: Docker@1
-            displayName: 'Push an image'
-            inputs:
-                azureSubscriptionEndpoint: ${{ variables.DevAcrSubscription }}
-                azureContainerRegistry: $(DevAcr)
-                command: 'Push an image'
-                imageName: '$(DevAcr)/$(ImageName):dev-latest'
+          VALUES_FILE="gitops/envs/dev/values-dev.yaml"
+          NEW_TAG="$(Build.BuildNumber)"
 
+          echo "File.......: ${VALUES_FILE}"
+          echo "New tag....: ${NEW_TAG}"
+          echo
+
+          if [ ! -f "${VALUES_FILE}" ]; then
+            echo "ERROR: values file not found: ${VALUES_FILE}"
+            exit 1
+          fi
+
+          echo "Before:"
+          grep 'tag:' "${VALUES_FILE}" || true
+          echo
+
+          # Ejemplo simple: sustituir la línea 'tag: ...'
+          # En un entorno real usaríamos 'yq' u otra herramienta YAML-aware.
+          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+          echo "After:"
+          grep 'tag:' "${VALUES_FILE}" || true
+        displayName: 'Update image.tag in DEV values (GitOps)'
+
+    # --- QA: rama release → gitops/envs/qa/values-qa.yaml ---
     - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
-          - task: Docker@0
-            displayName: 'Pull Development Container Image'
-            inputs:
-                azureSubscription: ${{ variables.QaAcrSubscription }}
-                azureContainerRegistry: $(QaAcr)
-                action: 'Run a Docker command'
-                customCommand: 'pull $(QaAcr)/$(ImageName):$(Build.BuildNumber)'
+      - script: |
+          echo "=== GitOps: updating image tag for QA ==="
 
-          - task: Docker@1
-            displayName: 'Tag Container Image Release'
-            inputs:
-                azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
-                azureContainerRegistry: $(QaAcr)
-                command: 'Tag image'
-                arguments: '$(QaAcr)/$(ImageName):qa-latest'
-                imageName: '$(QaAcr)/$(ImageName):$(Build.BuildNumber)'
+          VALUES_FILE="gitops/envs/qa/values-qa.yaml"
+          NEW_TAG="$(Build.BuildNumber)"
 
-          - task: Docker@1
-            displayName: 'Push Container Image Release'
-            inputs:
-                azureSubscriptionEndpoint: ${{ variables.QaAcrSubscription }}
-                azureContainerRegistry: $(QaAcr)
-                command: 'Push an image'
-                imageName: '$(QaAcr)/$(ImageName):qa-latest'
+          echo "File.......: ${VALUES_FILE}"
+          echo "New tag....: ${NEW_TAG}"
+          echo
+
+          if [ ! -f "${VALUES_FILE}" ]; then
+            echo "ERROR: values file not found: ${VALUES_FILE}"
+            exit 1
+          fi
+
+          echo "Before:"
+          grep 'tag:' "${VALUES_FILE}" || true
+          echo
+
+          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+          echo "After:"
+          grep 'tag:' "${VALUES_FILE}" || true
+        displayName: 'Update image.tag in QA values (GitOps)'
+
+    # --- PROD: tags (ej. refs/tags/v1.2.3) → gitops/envs/prod/values-prod.yaml ---
+    - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+      - script: |
+          echo "=== GitOps: updating image tag for PROD ==="
+
+          VALUES_FILE="gitops/envs/prod/values-prod.yaml"
+          NEW_TAG="$(Build.BuildNumber)"  # o la parte del tag que definas
+
+          echo "File.......: ${VALUES_FILE}"
+          echo "New tag....: ${NEW_TAG}"
+          echo
+
+          if [ ! -f "${VALUES_FILE}" ]; then
+            echo "ERROR: values file not found: ${VALUES_FILE}"
+            exit 1
+          fi
+
+          echo "Before:"
+          grep 'tag:' "${VALUES_FILE}" || true
+          echo
+
+          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+          echo "After:"
+          grep 'tag:' "${VALUES_FILE}" || true
+        displayName: 'Update image.tag in PROD values (GitOps)'
+
+    # --- Placeholder: commit & push / PR ---
+    - script: |
+        echo "=== GitOps: commit & push placeholder ==="
+        echo "Aqui se configuraría git user/email y se haría commit de los values:"
+        echo "  git config user.name \"CI\""
+        echo "  git config user.email \"ci@example.com\""
+        echo "  git add gitops/envs/*/values-*.yaml"
+        echo "  git commit -m \"chore(gitops): update image tag to $(Build.BuildNumber)\""
+        echo "  git push origin HEAD"
+        echo
+        echo "En una implementación más avanzada, este paso podría crear un Pull Request hacia el repo GitOps real."
+      displayName: 'Commit & push to GitOps repo (conceptual)'
+      condition: succeeded():
+
           
     

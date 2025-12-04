@@ -66,3 +66,28 @@ Para poder activar o desactivar este bloque de seguridad sin afectar a todos los
 - `min_coverage_threshold`, `sonar_project_key`, `sonar_service_connection`, `trivy_image`: quedan como placeholders para una futura integración real con herramientas de seguridad y análisis.
 
 El job de seguridad se incluye en el stage `technical_excellence_assurance` respetando la lógica actual por rama y tipo de build. Esto permite que el pipeline siga funcionando como hasta ahora y, al mismo tiempo, deja preparado el punto donde se integrarían los controles de seguridad y quality gates de forma homogénea para todos los stacks (netcore, java, python, angular) cuando la organización esté lista para activarlos.
+
+
+### 3.3 Modelo GitOps con Argo CD / Argo Rollouts / Kargo
+
+En lugar de que el pipeline despliegue directamente al clúster, el modelo propuesto para 3.3 es GitOps: el pipeline actualiza la declaración de estado en un repositorio (o carpeta) de configuración y una herramienta como Argo CD se encarga de sincronizar los cambios al clúster.
+
+En este repositorio lo represento de forma simplificada:
+
+- Creo una estructura `gitops/` con:
+  - Un `Application` de Argo CD de ejemplo (`gitops/argocd-app-sample.yaml`).
+  - Valores por entorno (`gitops/envs/dev|qa|prod/values-*.yaml`) donde se declara `image.tag`.
+- Adapto el job `pipeline/release/jobs/Update-tag.yml` para que:
+  - Reciba como parámetros el `environment`, el `imageTag` y la ruta del `values-<env>.yaml`.
+  - Actualice la clave `image.tag` en el archivo de valores (usando un script sencillo con `sed` como placeholder).
+  - Documente el punto donde se haría el commit/push o se abriría un Pull Request hacia el repositorio GitOps real.
+- Desde `pipeline/release/ecosystem-integration.yml`, el stage de release llama al template `Update-tag.yml` pasando el entorno y el tag generado en el build.
+
+El flujo resultante para un entorno sería:
+
+1. **CI**: build → tests → seguridad → generación de artefacto e imagen.
+2. **Release**: el pipeline actualiza `gitops/envs/<env>/values-<env>.yaml` con el nuevo `image.tag`.
+3. **GitOps**: Argo CD detecta el cambio en el repositorio de configuración y sincroniza el clúster.
+4. **Despliegue progresivo** (conceptual): Argo Rollouts/Kargo gestionan la estrategia (canary/blue-green, promoción entre entornos, etc.).
+
+En este ejercicio no implemento toda la integración real con Argo CD ni con Kargo, pero dejo clara la estructura de GitOps, el punto donde el pipeline actualiza la “verdad” (`values-*.yaml`) y cómo el modelo se extiende a múltiples entornos de forma declarativa.

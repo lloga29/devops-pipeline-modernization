@@ -20,7 +20,12 @@ stages:
     name: hosted-dockerized-linux
 
   jobs:
-    - template: jobs/kubernetes-deploy-jobs.yml
-      parameters:      
-        masteraks: ${{ parameters.masteraks }}
+    # 1) Nuevo flujo GitOps: actualizar image.tag en los values de gitops/ (DEV/QA/PROD)
     - template: jobs/Update-tag.yml
+
+    # 2) Despliegue directo al cluster (legacy) solo para ramas bajas (dev/support).
+    #    Para QA/Prod, la expectativa es que Argo CD/Kargo hagan el despliegue leyendo los manifests GitOps.
+    - ${{ if in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/support') }}:
+      - template: jobs/kubernetes-deploy-jobs.yml
+        parameters:
+          masteraks: ${{ parameters.masteraks }}
