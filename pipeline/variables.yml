@@ -17,5 +17,23 @@ variables:
  
  
  
- 
+ # ==== Security & Quality Gates (3.2) ====
+- name: enable_security_scans
+  value: true    # Permite activar/desactivar el stage de seguridad
+
+- name: fail_on_critical_vulns
+  value: true    # Si es true, el pipeline debería fallar ante vulnerabilidades críticas
+
+- name: min_coverage_threshold
+  value: 80      # Umbral mínimo de cobertura (ejemplo conceptual)
+
+# Placeholders para una futura integración real con SonarQube / Trivy
+- name: sonar_project_key
+  value: ''      # Ej: satrack.my-service
+- name: sonar_service_connection
+  value: ''      # Nombre de la Service Connection en Azure DevOps
+
+- name: trivy_image
+  value: ''      # Ej: my-registry/my-image:$(Build.BuildId)
+
  

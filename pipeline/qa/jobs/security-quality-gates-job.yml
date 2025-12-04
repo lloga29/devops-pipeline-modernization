@@ -1,0 +1,44 @@
+parameters:
+  - name: enableSecurityScans
+    type: boolean
+    default: true
+
+  - name: failOnCriticalVulns
+    type: boolean
+    default: true
+
+jobs:
+- job: security_quality_gates
+  displayName: 'Security & quality gates (basic)'
+  pool:
+    vmImage: 'ubuntu-latest'
+  # Solo se ejecuta si enableSecurityScans = true
+  condition: and(succeeded(), eq(${{ parameters.enableSecurityScans }}, true))
+
+  steps:
+    - checkout: self
+
+    # 1) Secret scanning (placeholder)
+    - script: |
+        echo "=== Secret scanning (placeholder) ==="
+        echo "Aqui se ejecutaría una herramienta tipo gitleaks/trufflehog sobre el repo."
+        echo "Si encuentra secretos, debe devolver exit 1 para romper el pipeline."
+        # exit 0  # mantener en 0 mientras sea solo ejemplo
+      displayName: 'Secret scanning (placeholder)'
+
+    # 2) SAST / SonarQube (placeholder)
+    - script: |
+        echo "=== SAST / SonarQube (placeholder) ==="
+        echo "Aqui se ejecutaría el Sonar Scanner para el stack correspondiente."
+        echo "El quality gate se verificaria via API / tarea dedicada y fallaría si es FAILED."
+      displayName: 'SAST / SonarQube (placeholder)'
+
+    # 3) Trivy filesystem / dependencias (placeholder)
+    - script: |
+        echo "=== Trivy filesystem scan (placeholder) ==="
+        echo "Aqui se ejecutaría 'trivy fs' sobre el código fuente para detectar vulnerabilidades."
+        if [ ${{ parameters.failOnCriticalVulns }} = true ]; then
+          echo "La lógica real revisaría el reporte de Trivy y haría exit 1 si hay vulnerabilidades CRITICAL."
+        fi
+        # exit 0  # mantener en 0 mientras sea solo ejemplo
+      displayName: 'Trivy filesystem scan (placeholder)'
