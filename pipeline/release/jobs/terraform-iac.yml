@@ -1,0 +1,80 @@
+parameters:
+  - name: terraformWorkingDir
+    type: string
+    default: 'iac'
+
+jobs:
+  - job: 'terraform_iac'
+    displayName: 'Terraform IaC (validate/plan/apply)'
+
+    steps:
+      - checkout: self
+
+      # Determinar entorno según la rama
+      - task: Bash@3
+        displayName: 'Terraform init + fmt + validate + plan'
+        inputs:
+          targetType: 'inline'
+          script: |
+            set -e
+
+            BRANCH_NAME="$(Build.SourceBranch)"
+
+            if [[ "$BRANCH_NAME" == "refs/heads/develop" ]]; then
+              ENVIRONMENT="dev"
+            elif [[ "$BRANCH_NAME" == "refs/heads/release" ]]; then
+              ENVIRONMENT="qa"
+            elif [[ "$BRANCH_NAME" == "refs/heads/support" ]]; then
+              ENVIRONMENT="atp"
+            else
+              # master/main/tags -> prod
+              ENVIRONMENT="prod"
+            fi
+
+            echo "Using environment: $ENVIRONMENT"
+            echo "Terraform working dir: ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT"
+
+            cd ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT
+
+ 
+            terraform init -input=false
+            terraform fmt -check
+            terraform validate
+
+            terraform plan \
+              -input=false \
+              -out=plan.tfplan \
+              -var-file="${ENVIRONMENT}.tfvars"
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publicar plan de Terraform'
+        inputs:
+          PathtoPublish: '${{ parameters.terraformWorkingDir }}'
+          ArtifactName: 'terraform-plan'
+          publishLocation: 'Container'
+
+      # Apply automático solo en dev/qa. Para atp/prod se espera aprobación/manual.
+      - task: Bash@3
+        displayName: 'Terraform apply (dev/qa)'
+        condition: or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/release')
+        )
+        inputs:
+          targetType: 'inline'
+          script: |
+            set -e
+
+            BRANCH_NAME="$(Build.SourceBranch)"
+
+            if [[ "$BRANCH_NAME" == "refs/heads/develop" ]]; then
+              ENVIRONMENT="dev"
+            elif [[ "$BRANCH_NAME" == "refs/heads/release" ]]; then
+              ENVIRONMENT="qa"
+            else
+              echo "Terraform apply automático solo habilitado para dev/qa"
+              exit 0
+            fi
+
+            cd ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT
+            terraform apply -input=false -auto-approve plan.tfplan

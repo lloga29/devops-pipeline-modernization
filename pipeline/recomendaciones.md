@@ -91,3 +91,31 @@ El flujo resultante para un entorno sería:
 4. **Despliegue progresivo** (conceptual): Argo Rollouts/Kargo gestionan la estrategia (canary/blue-green, promoción entre entornos, etc.).
 
 En este ejercicio no implemento toda la integración real con Argo CD ni con Kargo, pero dejo clara la estructura de GitOps, el punto donde el pipeline actualiza la “verdad” (`values-*.yaml`) y cómo el modelo se extiende a múltiples entornos de forma declarativa.
+
+
+* ## 3.4 Integración de IaC con Terraform y acople a GitOps
+
+Para este punto integré un flujo de Infraestructura como Código basado en Terraform dentro del stage `ecosystem_integration`, de manera que la infraestructura se gestione con el mismo rigor que el despliegue de aplicación.
+
+Concretamente añadí un nuevo job reusable `jobs/terraform-iac.yml`, que es invocado desde `ecosystem_integration` justo después de la actualización de tags GitOps (`jobs/Update-tag.yml`). Este job determina el entorno en función de la rama (`develop → dev`, `release → qa`, `support → atp`, `master/main/tags → prod`) y ejecuta el ciclo estándar de Terraform:
+
+- `terraform init` para inicializar el directorio de trabajo.
+- `terraform fmt -check` y `terraform validate` para asegurar consistencia y sintaxis.
+- `terraform plan` con un `plan.tfplan` por entorno, que se publica como artefacto del pipeline.
+
+Para que se pueda ver claramente dónde viviría la IaC, dejé un árbol mínimo bajo `iac/`:
+
+```text
+iac/
+  dev/
+    main.tf
+    dev.tfvars
+  qa/
+    main.tf
+    qa.tfvars
+  atp/
+    main.tf
+    atp.tfvars
+  prod/
+    main.tf
+    prod.tfvars
