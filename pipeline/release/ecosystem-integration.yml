@@ -14,8 +14,10 @@ stages:
     - 'artifacts_managment'
     - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
       - 'development_integration'
+
   condition:
     in(dependencies.artifacts_managment.result, 'Succeeded', 'SucceededWithIssues')
+
   pool:
     name: hosted-dockerized-linux
 
@@ -23,7 +25,12 @@ stages:
     # 1) Nuevo flujo GitOps: actualizar image.tag en los values de gitops/ (DEV/QA/PROD)
     - template: jobs/Update-tag.yml
 
-    # 2) Despliegue directo al cluster (legacy) solo para ramas bajas (dev/support).
+    # 2) IaC con Terraform: validate/plan/apply según rama/entorno
+    - template: jobs/terraform-iac.yml
+      parameters:
+        terraformWorkingDir: 'iac'
+
+    # 3) Despliegue directo al cluster (legacy) solo para ramas bajas (dev/support).
     #    Para QA/Prod, la expectativa es que Argo CD/Kargo hagan el despliegue leyendo los manifests GitOps.
     - ${{ if in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/support') }}:
       - template: jobs/kubernetes-deploy-jobs.yml
