@@ -22,7 +22,7 @@ Se recomienda evolucionar el pipeline incluyendo:
 5. Rollback y pruebas de humo.
 
 
-### Modelo de stacks para el pipeline de build (3.1)
+### 3.1 Modelo de stacks para el pipeline de build
 
 El template principal `pipeline/main.yml` expone un parámetro `stack` que representa el stack tecnológico completo (lenguaje + tipo de build). En lugar de seguir añadiendo condiciones `if` por lenguaje, el pipeline delega en un router de build (`pipeline/build/development-integration.yml`) que invoca dinámicamente `jobs/<stack>-job.yml`.
 
@@ -37,22 +37,32 @@ Para añadir un nuevo stack, basta con:
 1. Agregar el nuevo valor en `parameters.stack.values` en `pipeline/main.yml`.
 2. Crear el archivo `pipeline/build/jobs/<stack>-job.yml` con la lógica de build y tests correspondiente.
 
-### 3.2 Seguridad y quality gates integrados en el pipeline
+### 3.2 Seguridad y quality gates en el stage de Technical Excellence
 
-El stage de **Technical Excellence** se amplía con un job de seguridad y quality gates, definido en `pipeline/qa/jobs/security-quality-gates-job.yml` y conectado desde `pipeline/qa/technical-excellence-assurance.yml`.
+Para este punto no busco montar toda la integración real con SonarQube o Trivy, sino dejar el diseño claro dentro del pipeline y mostrar cómo se integraría la seguridad como parte estándar del flujo y no como algo separado.
 
-Este job ejecuta tres pasos conceptuales:
+En el stage `technical_excellence_assurance` (`pipeline/qa/technical-excellence-assurance.yml`) agregué un nuevo job basado en el template:
+
+- `pipeline/qa/jobs/security-quality-gates-job.yml`
+
+Este job se ejecuta como parte del stage de Technical Excellence y representa el bloque de **seguridad y quality gates**. Su comportamiento actual es intencionalmente sencillo, a modo de placeholder, pero deja claros los puntos de integración:
 
 1. **Secret scanning (placeholder)**  
-   Tras el checkout del repositorio, se ejecutaría una herramienta tipo `gitleaks` o `trufflehog` para detectar credenciales expuestas.  
-   En una implementación real, cualquier secreto encontrado haría fallar el pipeline (`exit 1`).
+   Tras el `checkout`, el job ejecuta un script donde dejo explícito que aquí se integraría una herramienta tipo `gitleaks` o `trufflehog` para buscar secretos y credenciales expuestas en el repositorio.  
+   En una implementación real, cualquier secreto encontrado debería terminar en `exit 1` para romper el pipeline.
 
 2. **SAST / SonarQube (placeholder)**  
-   Se ejecutaría el análisis estático con SonarQube (o equivalente) para el stack correspondiente y se verificaría el *quality gate*.  
-   Si el quality gate es `FAILED` o la cobertura está por debajo de `min_coverage_threshold`, el pipeline se marca como `FAILED`.
+   En un segundo paso se documenta el lugar donde se ejecutaría el análisis estático (por ejemplo, SonarQube o una herramienta equivalente).  
+   La idea es que el quality gate de Sonar (cobertura, vulnerabilidades, code smells, etc.) se valide aquí, y si el resultado es `FAILED` el pipeline marque el stage como fallido.
 
 3. **Escaneo de vulnerabilidades (Trivy filesystem, placeholder)**  
-   Se lanzaría un escaneo de vulnerabilidades sobre el código/artefactos con `trivy fs`.  
-   La variable `fail_on_critical_vulns` controla si el pipeline debe romperse en presencia de vulnerabilidades `CRITICAL`.
+   En el tercer paso se indica explícitamente que aquí entraría un `trivy fs` (u otra herramienta SCA) contra el código fuente o los artefactos generados.  
+   La variable `fail_on_critical_vulns` controla la política: en el diseño, si esta variable está a `true` y el reporte contiene vulnerabilidades `CRITICAL`, el pipeline debería fallar.
 
-Las variables relacionadas se declaran en `pipeline/variables.yml` (`enable_security_scans`, `fail_on_critical_vulns`, `min_coverage_threshold`, `sonar_*`, `trivy_image`) y permiten activar o desactivar este stage de forma progresiva sin afectar a los equipos que aún no han adoptado el modelo extendido.
+Para poder activar o desactivar este bloque de seguridad sin afectar a todos los equipos de golpe, añadí variables en `pipeline/variables.yml`:
+
+- `enable_security_scans`: permite encender o apagar el job de seguridad desde configuración.
+- `fail_on_critical_vulns`: define si el pipeline debe romperse ante vulnerabilidades críticas.
+- `min_coverage_threshold`, `sonar_project_key`, `sonar_service_connection`, `trivy_image`: quedan como placeholders para una futura integración real con herramientas de seguridad y análisis.
+
+El job de seguridad se incluye en el stage `technical_excellence_assurance` respetando la lógica actual por rama y tipo de build. Esto permite que el pipeline siga funcionando como hasta ahora y, al mismo tiempo, deja preparado el punto donde se integrarían los controles de seguridad y quality gates de forma homogénea para todos los stacks (netcore, java, python, angular) cuando la organización esté lista para activarlos.
