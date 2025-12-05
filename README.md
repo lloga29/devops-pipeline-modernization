@@ -44,7 +44,7 @@ terraform apply -var-file={env}.tfvars
 Para facilitar la revisión de la solución, la documentación se organizó en la carpeta `docs/`:
 
 - [Análisis del pipeline actual](docs/analisis-pipeline-actual.md)
-- [Diagrama del pipeline CI/CD revisado](docs/diagrams/)
+- [Diagrama del pipeline CI/CD revisado](docs/diagrams/pipeline.drawio.svg)
 - [Conclusiones y recomendaciones](docs/conclusiones-y-recomendaciones.md)
 - [Recomendaciones técnicas detalladas del pipeline](pipeline/recomendaciones.md)
 
