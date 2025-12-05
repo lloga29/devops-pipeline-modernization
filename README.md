@@ -1,3 +1,6 @@
+Este repositorio corresponde a la prueba técnica de DevOps Senior.
+Partí del pipeline template actual de Satrack y lo extendí para soportar nuevos lenguajes, GitOps, IaC y escenarios multinube, manteniendo compatibilidad con el flujo existente.
+
 # DevOps Pipeline Modernization
 
 Repositorio de pipelines de CI/CD modernizados para Azure DevOps, implementando mejores prácticas de DevOps, GitOps, Infrastructure as Code y arquitectura de microservicios.
@@ -59,10 +62,3 @@ Para facilitar la revisión de la solución, la documentación se organizó en l
 - Infraestructura versionada y reproducible
 - Backend remoto para estado de Terraform
 - Auto-healing con ArgoCD
-
-## 🤝 Contribución
-
-1. Crear rama feature desde `main`
-2. Implementar cambios siguiendo convenciones
-3. Crear Pull Request para revisión
-4. Merge a `main` tras aprobación
