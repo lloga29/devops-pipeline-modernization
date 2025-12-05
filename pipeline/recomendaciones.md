@@ -35,7 +35,9 @@ Se recomienda evolucionar el pipeline incluyendo:
 
 ## 3.1 Modelo de stacks para el pipeline de build
 
-El template principal `pipeline/main.yml` expone un parámetro `stack` que representa el stack tecnológico completo (lenguaje + tipo de build). En lugar de seguir añadiendo condiciones `if` por lenguaje, el pipeline delega en un router de build (`pipeline/build/development-integration.yml`) que invoca dinámicamente `jobs/<stack>-job.yml`.
+Mi propuesta es unificar el modelo de pipeline alrededor de un único parámetro `stack`, de forma  que representa el stack tecnológico completo (lenguaje + tipo de build). En lugar de seguir añadiendo condiciones `if` por lenguaje, el pipeline delega en un router de build (`pipeline/build/development-integration.yml`) que invoca dinámicamente `jobs/<stack>-job.yml`.
+
+Ej.
 
 Stacks soportados:
 - `netcore` → `jobs/netcore-job.yml`
@@ -85,7 +87,7 @@ El job de seguridad se incluye en el stage `technical_excellence_assurance` resp
 
 ## 3.3 Modelo GitOps con Argo CD / Argo Rollouts / Kargo
 
-En lugar de que el pipeline despliegue directamente al clúster, el modelo propuesto para 3.3 es GitOps: el pipeline actualiza la declaración de estado en un repositorio (o carpeta) de configuración y una herramienta como Argo CD se encarga de sincronizar los cambios al clúster.
+Para evitar problemas recurrentes de versiones mezcladas entre entornos, propongo que la promoción se haga siempre vía GitOps y no por cambios manuales en Azure DevOps, en lugar de que el pipeline despliegue directamente al clúster, el modelo propuesto para 3.3 es GitOps: el pipeline actualiza la declaración de estado en un repositorio (o carpeta) de configuración y una herramienta como Argo CD se encarga de sincronizar los cambios al clúster.
 
 En este repositorio lo represento de forma simplificada:
 
@@ -137,6 +139,10 @@ iac/
 ---
 
 ## 3.5 Configuración del repositorio para IaC + GitOps y soporte multinube
+
+Hoy el pipeline está acoplado a un solo proveedor de nube.
+
+Mi propuesta es mantener el pipeline agnóstico y delegar la lógica específica de Azure/AWS/GCP en Terraform e IaC, usando un parámetro `cloud` como selector.
 
 En este punto enfoqué el trabajo en ordenar el repositorio para que infraestructura, despliegue y configuración declarativa queden alineados y preparados para escenarios multinube, sin acoplar el pipeline a un proveedor específico.
 

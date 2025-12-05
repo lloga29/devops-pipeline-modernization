@@ -1,3 +1,4 @@
+
 # GitOps Configuration
 
 Este directorio implementa la metodología GitOps para el despliegue automatizado de aplicaciones en Kubernetes usando ArgoCD como herramienta de Continuous Deployment.
@@ -45,6 +46,9 @@ Pipeline CI actualiza → values-{env}.yaml con nuevo tag
 ```
 
 ### 3. Despliegue Automático (CD con ArgoCD)
+Este mismo modelo lo uso para separar dev/qa/prod y permitir que promociones pasen siempre por un commit trazable.
+
+
 ```
 ArgoCD monitorea Git → Detecta cambio → Compara con cluster
                                               ↓

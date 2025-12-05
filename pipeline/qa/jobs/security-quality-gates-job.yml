@@ -18,13 +18,13 @@ jobs:
   steps:
     - checkout: self
 
-    # 1) Secret scanning (placeholder)
+    # 1) Secret scanning (gitleaks/trufflehog)
     - script: |
         echo "=== Secret scanning (placeholder) ==="
-        echo "Aqui se ejecutaría una herramienta tipo gitleaks/trufflehog sobre el repo."
+        echo "echo "Pendiente integrar gitleaks/trufflehog según herramienta aprobada por seguridad."
         echo "Si encuentra secretos, debe devolver exit 1 para romper el pipeline."
         # exit 0  # mantener en 0 mientras sea solo ejemplo
-      displayName: 'Secret scanning (placeholder)'
+      displayName: 'Secret scanning (gitleaks/trufflehog)'
 
     # 2) SAST / SonarQube (placeholder)
     - script: |

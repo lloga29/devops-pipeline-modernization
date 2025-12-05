@@ -27,6 +27,8 @@ terraform init
 # Planificar cambios
 terraform plan -var-file=dev.tfvars
 
+En la práctica, suelo revisar siempre el `terraform plan` con alguien de plataforma/seguridad antes de aplicar cambios en QA/Prod.
+
 # Aplicar cambios
 terraform apply -var-file=dev.tfvars
 ```

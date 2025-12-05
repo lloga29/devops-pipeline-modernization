@@ -1,4 +1,5 @@
-# pipeline/release/terraform-iac.yml
+# En un escenario real, este job apuntaría a módulos Terraform distintos según CLOUD (azure/aws),
+# reutilizando la misma interfaz de pipeline pero con implementaciones diferentes.
 parameters:
 - name: environment
   type: string

@@ -62,6 +62,7 @@ La propuesta de los puntos 3.1–3.6 transforma el pipeline en un modelo modular
 ## 4. Estrategia de adopción por fases
 
 Propongo una adopción gradual, alineada con el punto 3.6:
+Mi propuesta es que este flujo se adopte primero en desarrollo y QA antes de llevarlo a producción teniendo tambien en cuenta ambientes criticos de ultimas.
 
 1. **Fase 0 – Baseline y compatibilidad**  
    - Mantener el pipeline actual con todos los flags en modo “legacy” (`enable_gitops=false`, `enable_iac=false`, etc.).  
@@ -95,3 +96,6 @@ Para medir el impacto de la propuesta y ajustar la adopción, propongo seguir al
 - **Uso efectivo de IaC y GitOps**: número de cambios de infraestructura y despliegues registrados y auditables vía Git.
 
 La combinación de estas métricas con revisiones periódicas (por ejemplo, trimestrales) permitirá ajustar el pipeline, priorizar mejoras adicionales y demostrar a negocio y seguridad que la inversión en este modelo se traduce en mayor eficiencia, menor riesgo y una plataforma preparada para crecer en múltiples nubes.
+
+Para evitar problemas recurrentes durante las ventanas de despliegue, propongo documentar runbooks claros y apoyarse en GitOps como única fuente de verdad.
+

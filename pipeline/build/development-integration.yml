@@ -39,7 +39,7 @@ parameters:
 
 stages:
 - stage: 'development_integration'
-  displayName: Development Integration
+  displayName: Development Integration Stage
   pool:
     name: ${{ parameters.agent }}
   dependsOn: []
