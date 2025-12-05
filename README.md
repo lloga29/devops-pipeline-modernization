@@ -1,3 +1,6 @@
+Este repositorio corresponde a la prueba técnica de DevOps Senior.
+Partí del pipeline template actual de Satrack y lo extendí para soportar nuevos lenguajes, GitOps, IaC y escenarios multinube, manteniendo compatibilidad con el flujo existente.
+
 # DevOps Pipeline Modernization
 
 Repositorio de pipelines de CI/CD modernizados para Azure DevOps, implementando mejores prácticas de DevOps, GitOps, Infrastructure as Code y arquitectura de microservicios.
