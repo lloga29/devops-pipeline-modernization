@@ -119,3 +119,59 @@ iac/
   prod/
     main.tf
     prod.tfvars
+
+
+### 3.5 Configuración del repositorio para IaC + GitOps y soporte multinube
+
+En este punto enfoqué el trabajo en ordenar el repositorio para que infraestructura, despliegue y configuración declarativa queden alineados y preparados para escenarios multinube, sin acoplar el pipeline a un proveedor específico.
+
+Partí de tres pilares claros:
+
+- `pipeline/`: definición del flujo de CI/CD en Azure DevOps.
+- `iac/`: definición de infraestructura con Terraform segmentada por entorno (`dev`, `qa`, `prod`).
+- `gitops/`: configuración declarativa de despliegue (Helm/Argo CD) con un `values-<env>.yaml` por entorno.
+
+La idea es que el pipeline hable solo en términos de **entorno** y **versión**, mientras que los detalles de nube (Azure, AWS u otro proveedor) se resuelven en las capas de IaC y configuración, no en el YAML del pipeline.
+
+#### Estructura del repositorio
+
+Dejé la estructura organizada de la siguiente forma:
+
+- `iac/dev`, `iac/qa`, `iac/prod`: cada carpeta contiene el `main.tf` y el `<env>.tfvars` con los parámetros propios de ese entorno. Aquí es donde se define el provider (por ejemplo `azurerm` hoy y, si se necesitara, `aws` u otro en el futuro).
+- `gitops/envs/dev/values-dev.yaml`, `gitops/envs/qa/values-qa.yaml`, `gitops/envs/prod/values-prod.yaml`: estos archivos actúan como única fuente de verdad para la versión de la imagen (`image.tag`) y demás parámetros de despliegue por entorno.
+- `pipeline/release/terraform-iac.yml`: plantilla de release que ejecuta Terraform apuntando a `iac/<env>` en función del entorno.
+- `pipeline/release/jobs/Update-tag.yml`: job responsable de actualizar el `image.tag` en el values correspondiente según la rama (`develop` → dev, `release` → qa, tags → prod).
+
+Con esta organización, el repositorio queda preparado para que la misma definición de pipeline pueda trabajar con uno o varios clusters, incluso en nubes distintas, sin tener que duplicar lógica.
+
+#### Conexión con el pipeline de release
+
+En el stage `ecosystem_integration` conecté estas piezas de la siguiente forma:
+
+1. A partir de la rama, el pipeline determina el entorno objetivo:
+   - `refs/heads/develop` → entorno `dev`
+   - `refs/heads/release` → entorno `qa`
+   - `refs/tags/*` → entorno `prod`
+2. El template `terraform-iac.yml` se ejecuta contra `iac/<env>`, aplicando la infraestructura necesaria para ese entorno (hoy sobre AKS, pero el provider puede cambiar sin tocar el pipeline).
+3. Una vez desplegada la aplicación (job `release_aks`), el job `update_tag` actualiza el campo `tag` dentro del `values-<env>.yaml` correspondiente en `gitops/envs/<env>/`.
+4. Finalmente, el pipeline realiza el commit y push de ese cambio a Git. Argo CD u otra herramienta GitOps se encarga de observar el repositorio y aplicar la configuración al cluster que corresponda.
+
+De esta manera, el pipeline no “sabe” si está desplegando en Azure, AWS o un cluster on-premise: solo declara qué versión debe ejecutarse en cada entorno. El acoplamiento a la nube se limita a los ficheros de Terraform (`iac/`) y a los templates de variables (`SatrackVars-*.yml`), que contienen los detalles del cluster y del proveedor.
+
+#### Soporte multinube
+
+El enfoque es multinube por diseño:
+
+- Si mañana QA pasa de AKS a EKS, el cambio se limita a:
+  - Ajustar el provider y recursos en `iac/qa`.
+  - Actualizar las variables del cluster QA en el template correspondiente de `SatrackVars`.
+  - (Opcionalmente) ajustar la Application de Argo CD para apuntar al nuevo cluster.
+- El pipeline, el job `update_tag` y los `values-qa.yaml` seguirían funcionando exactamente igual, porque solo trabajan con entornos y tags, no con proveedores.
+
+Esto permite:
+
+- Reutilizar el mismo pipeline para distintos clusters y nubes.
+- Mantener una única fuente de verdad por entorno en los `values-*.yaml`.
+- Tener trazabilidad completa de qué versión se desplegó en cada entorno a través del historial de Git.
+
+En resumen, en el punto 3.5 dejé el repositorio y el pipeline preparados para que IaC (Terraform) y GitOps trabajen juntos de forma coherente, y para que un cambio de nube no implique reescribir el pipeline, sino únicamente ajustar la capa de infraestructura y las variables de entorno.

@@ -1,44 +1,165 @@
-parameters:
-- name: environment
-  type: string
-  default: 'dev'
-  values:
-    - dev
-    - qa
-    - prod
+jobs:
+- job: 'update_tag'
+  displayName: 'Update Tag'
+  dependsOn: 'release_aks'
+  pool:
+    name: Vmss-Agents
 
-- name: imageTag
-  type: string
+  # =========================
+  # Variables por rama / cluster (masteraks)
+  # =========================
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    variables:
+    - template: ../../SatrackVars.yml
 
-steps:
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+    variables:
+    - template: ../../SatrackVars.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'AksSatrackBigData'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-Bigdata.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-tracking.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform2'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-tracking2.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'AksSatrack3'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-aks3.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'aks-products'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-products.yml
+
+  ${{ if and(eq(parameters['masteraks'], 'Aks-app-integrations'), eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+    variables:
+    - template: ../../SatrackVars-app.yml
+
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
+    variables:
+    - template: ../../SatrackVars.yml
+
+  # =========================
+  # Steps: actualizar values GitOps por entorno
+  # =========================
+  steps:
   - checkout: self
+    displayName: 'Checkout repo (app + gitops)'
     persistCredentials: true
 
-  - task: Bash@3
-    displayName: 'Update image.tag in GitOps values file'
-    inputs:
-      targetType: 'inline'
-      script: |
+  # --- DEV: rama develop → gitops/envs/dev/values-dev.yaml ---
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+    - bash: |
         set -e
-        ENV="${{ parameters.environment }}"
-        TAG="${{ parameters.imageTag }}"
+        echo "=== GitOps: updating image tag for DEV ==="
 
-        case "${ENV}" in
-          dev)  VALUES_FILE="gitops/envs/dev/values-dev.yaml" ;;
-          qa)   VALUES_FILE="gitops/envs/qa/values-qa.yaml" ;;
-          prod) VALUES_FILE="gitops/envs/prod/values-prod.yaml" ;;
-          *)    echo "Unknown environment: ${ENV}"; exit 1 ;;
-        esac
+        VALUES_FILE="gitops/envs/dev/values-dev.yaml"
+        NEW_TAG="$(Build.BuildNumber)"
 
-        cd $(Build.SourcesDirectory)
+        echo "File.......: ${VALUES_FILE}"
+        echo "New tag....: ${NEW_TAG}"
+        echo
 
-        echo "Updating image.tag to ${TAG} in ${VALUES_FILE}"
-        yq -i ".image.tag = \"${TAG}\"" "${VALUES_FILE}"
+        if [ ! -f "${VALUES_FILE}" ]; then
+          echo "ERROR: values file not found: ${VALUES_FILE}"
+          exit 1
+        fi
 
-        git config user.email "ci@satrack.local"
-        git config user.name  "CI Pipeline"
+        echo "Before:"
+        grep 'tag:' "${VALUES_FILE}" || true
+        echo
 
-        git status
-        git add "${VALUES_FILE}"
-        git commit -m "chore(gitops): update image.tag to ${TAG} (${ENV})" || echo "No changes to commit"
-        git push || echo "Nothing to push (no changes)"
+        # Sustituir la línea '  tag: ...' (ajusta indentación si tu values es distinto)
+        sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+        echo "After:"
+        grep 'tag:' "${VALUES_FILE}" || true
+      displayName: 'Update image.tag in DEV values (GitOps)'
+
+  # --- QA: rama release → gitops/envs/qa/values-qa.yaml ---
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
+    - bash: |
+        set -e
+        echo "=== GitOps: updating image tag for QA ==="
+
+        VALUES_FILE="gitops/envs/qa/values-qa.yaml"
+        NEW_TAG="$(Build.BuildNumber)"
+
+        echo "File.......: ${VALUES_FILE}"
+        echo "New tag....: ${NEW_TAG}"
+        echo
+
+        if [ ! -f "${VALUES_FILE}" ]; then
+          echo "ERROR: values file not found: ${VALUES_FILE}"
+          exit 1
+        fi
+
+        echo "Before:"
+        grep 'tag:' "${VALUES_FILE}" || true
+        echo
+
+        sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+        echo "After:"
+        grep 'tag:' "${VALUES_FILE}" || true
+      displayName: 'Update image.tag in QA values (GitOps)'
+
+  # --- PROD: tags (refs/tags/vX.Y.Z) → gitops/envs/prod/values-prod.yaml ---
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+    - bash: |
+        set -e
+        echo "=== GitOps: updating image tag for PROD ==="
+
+        VALUES_FILE="gitops/envs/prod/values-prod.yaml"
+        NEW_TAG="$(Build.BuildNumber)"  # o extraer de la tag si quieres usar vX.Y.Z
+
+        echo "File.......: ${VALUES_FILE}"
+        echo "New tag....: ${NEW_TAG}"
+        echo
+
+        if [ ! -f "${VALUES_FILE}" ]; then
+          echo "ERROR: values file not found: ${VALUES_FILE}"
+          exit 1
+        fi
+
+        echo "Before:"
+        grep 'tag:' "${VALUES_FILE}" || true
+        echo
+
+        sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
+
+        echo "After:"
+        grep 'tag:' "${VALUES_FILE}" || true
+      displayName: 'Update image.tag in PROD values (GitOps)'
+
+  # --- Commit & push real al repo GitOps (monorepo en este caso) ---
+  - bash: |
+      set -e
+      echo "=== GitOps: commit & push changes ==="
+
+      cd $(Build.SourcesDirectory)
+
+      echo "Git status before commit:"
+      git status
+
+      # Si no hay cambios, salir sin error
+      if git diff --quiet; then
+        echo "No changes to commit. Skipping commit & push."
+        exit 0
+      fi
+
+      git config user.email "ci@satrack.local"
+      git config user.name  "CI Pipeline"
+
+      git add gitops/envs/*/values-*.yaml
+      git commit -m "chore(gitops): update image tag to $(Build.BuildNumber)"
+
+      echo "Pushing changes..."
+      git push origin HEAD
+    displayName: 'Commit & push to GitOps repo'
+    condition: succeeded()
