@@ -1,28 +1,39 @@
-# <center> Oportunidades de mejora. </center>
+# Oportunidades de Mejora
 
 En la creación de las plantillas se encontraron varios aspectos que podrían mejorarse en el futuro en los pipeline como código.
 
-* ## Uso de Helm para despliegues en AKS.
+## Uso de Helm para despliegues en AKS
+
 Con esta herramienta se puede hacer la gestión de despliegues en los diferentes ambientes.
-* ## Definición de pruebas obligatorias.
+
+## Definición de pruebas obligatorias
+
 Se recomienda definir el tipo de pruebas que todos los proyectos deban implementar en la ejecución del pipeline para garantizar una mayor seguridad y calidad de las aplicaciones.
-* ## Aplicación de políticas a los repositorios.
+
+## Aplicación de políticas a los repositorios
+
 Dentro de las configuraciones que deben realizarse a los repositorios que implementen las plantillas, se debe:
+
 1. Restringir los cambios en el código en las ramas develop, release y master.
 2. Definir grupos de aprobadores para los pull requests en cada paso.
 
-* ##Pipeline de creación de repositorio.
+## Pipeline de creación de repositorio
+
 Crear un pipeline que se encargue de crear los repositorios para nuevos proyectos con la estructura base de las carpetas y que se encargue de aplicar las políticas definidas para los repositorios.
-* ## Evolución del pipeline.
+
+## Evolución del pipeline
+
 Se recomienda evolucionar el pipeline incluyendo:
+
 1. Pruebas de seguridad
 2. Análisis de contenedores
 3. Compliance Testing
-4. Pull request automáticos.
-5. Rollback y pruebas de humo.
+4. Pull request automáticos
+5. Rollback y pruebas de humo
 
+---
 
-### 3.1 Modelo de stacks para el pipeline de build
+## 3.1 Modelo de stacks para el pipeline de build
 
 El template principal `pipeline/main.yml` expone un parámetro `stack` que representa el stack tecnológico completo (lenguaje + tipo de build). En lugar de seguir añadiendo condiciones `if` por lenguaje, el pipeline delega en un router de build (`pipeline/build/development-integration.yml`) que invoca dinámicamente `jobs/<stack>-job.yml`.
 
@@ -34,10 +45,13 @@ Stacks soportados:
 - `angular` → `jobs/angular-job.yml`
 
 Para añadir un nuevo stack, basta con:
+
 1. Agregar el nuevo valor en `parameters.stack.values` en `pipeline/main.yml`.
 2. Crear el archivo `pipeline/build/jobs/<stack>-job.yml` con la lógica de build y tests correspondiente.
 
-### 3.2 Seguridad y quality gates en el stage de Technical Excellence
+---
+
+## 3.2 Seguridad y quality gates en el stage de Technical Excellence
 
 Para este punto no busco montar toda la integración real con SonarQube o Trivy, sino dejar el diseño claro dentro del pipeline y mostrar cómo se integraría la seguridad como parte estándar del flujo y no como algo separado.
 
@@ -67,8 +81,9 @@ Para poder activar o desactivar este bloque de seguridad sin afectar a todos los
 
 El job de seguridad se incluye en el stage `technical_excellence_assurance` respetando la lógica actual por rama y tipo de build. Esto permite que el pipeline siga funcionando como hasta ahora y, al mismo tiempo, deja preparado el punto donde se integrarían los controles de seguridad y quality gates de forma homogénea para todos los stacks (netcore, java, python, angular) cuando la organización esté lista para activarlos.
 
+---
 
-### 3.3 Modelo GitOps con Argo CD / Argo Rollouts / Kargo
+## 3.3 Modelo GitOps con Argo CD / Argo Rollouts / Kargo
 
 En lugar de que el pipeline despliegue directamente al clúster, el modelo propuesto para 3.3 es GitOps: el pipeline actualiza la declaración de estado en un repositorio (o carpeta) de configuración y una herramienta como Argo CD se encarga de sincronizar los cambios al clúster.
 
@@ -90,10 +105,11 @@ El flujo resultante para un entorno sería:
 3. **GitOps**: Argo CD detecta el cambio en el repositorio de configuración y sincroniza el clúster.
 4. **Despliegue progresivo** (conceptual): Argo Rollouts/Kargo gestionan la estrategia (canary/blue-green, promoción entre entornos, etc.).
 
-En este ejercicio no implemento toda la integración real con Argo CD ni con Kargo, pero dejo clara la estructura de GitOps, el punto donde el pipeline actualiza la “verdad” (`values-*.yaml`) y cómo el modelo se extiende a múltiples entornos de forma declarativa.
+En este ejercicio no implemento toda la integración real con Argo CD ni con Kargo, pero dejo clara la estructura de GitOps, el punto donde el pipeline actualiza la "verdad" (`values-*.yaml`) y cómo el modelo se extiende a múltiples entornos de forma declarativa.
 
+---
 
-* ## 3.4 Integración de IaC con Terraform y acople a GitOps
+## 3.4 Integración de IaC con Terraform y acople a GitOps
 
 Para este punto integré un flujo de Infraestructura como Código basado en Terraform dentro del stage `ecosystem_integration`, de manera que la infraestructura se gestione con el mismo rigor que el despliegue de aplicación.
 
@@ -113,15 +129,14 @@ iac/
   qa/
     main.tf
     qa.tfvars
-  atp/
-    main.tf
-    atp.tfvars
   prod/
     main.tf
     prod.tfvars
+```
 
+---
 
-### 3.5 Configuración del repositorio para IaC + GitOps y soporte multinube
+## 3.5 Configuración del repositorio para IaC + GitOps y soporte multinube
 
 En este punto enfoqué el trabajo en ordenar el repositorio para que infraestructura, despliegue y configuración declarativa queden alineados y preparados para escenarios multinube, sin acoplar el pipeline a un proveedor específico.
 
@@ -176,23 +191,23 @@ Esto permite:
 
 En resumen, en el punto 3.5 dejé el repositorio y el pipeline preparados para que IaC (Terraform) y GitOps trabajen juntos de forma coherente, y para que un cambio de nube no implique reescribir el pipeline, sino únicamente ajustar la capa de infraestructura y las variables de entorno.
 
-Mantener el esqueleto build → test → security → release → deploy
+---
 
-Revisar pipeline/main.yml y validar que la estructura principal de stages se mantenga:
+## 3.6 Continuidad con el flujo existente
 
-build
+### Mantener el esqueleto build → test → security → release → deploy
 
-test
+Revisar `pipeline/main.yml` y validar que la estructura principal de stages se mantenga:
 
-security (solo si aplica)
+- build
+- test
+- security (solo si aplica)
+- release
+- deploy
 
-release
+Los nuevos bloques (GitOps, IaC, multinube, seguridad extendida) deben colgarse de estos stages sin introducir "saltos" nuevos en el flujo.
 
-deploy
-
-Los nuevos bloques (GitOps, IaC, multinube, seguridad extendida) deben colgarse de estos stages sin introducir “saltos” nuevos en el flujo.
-
-Definir flags de modo extendido en pipeline/variables.yml
+### Definir flags de modo extendido en pipeline/variables.yml
 
 Añadir variables con valor por defecto false:
 
