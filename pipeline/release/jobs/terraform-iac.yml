@@ -1,80 +1,57 @@
+# pipeline/release/terraform-iac.yml
 parameters:
-  - name: terraformWorkingDir
-    type: string
-    default: 'iac'
+- name: environment
+  type: string
+  default: 'dev'
+  values:
+    - dev
+    - qa
+    - prod
 
-jobs:
-  - job: 'terraform_iac'
-    displayName: 'Terraform IaC (validate/plan/apply)'
+steps:
+  - checkout: self
 
-    steps:
-      - checkout: self
+  - task: Bash@3
+    displayName: 'Terraform init + validate (${{ parameters.environment }})'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -e
+        ENV="${{ parameters.environment }}"
+        IAC_DIR="iac/${ENV}"
 
-      # Determinar entorno según la rama
-      - task: Bash@3
-        displayName: 'Terraform init + fmt + validate + plan'
-        inputs:
-          targetType: 'inline'
-          script: |
-            set -e
+        echo "Using IaC directory: ${IAC_DIR}"
+        cd $(Build.SourcesDirectory)/${IAC_DIR}
 
-            BRANCH_NAME="$(Build.SourceBranch)"
+        terraform init
+        terraform fmt -check
+        terraform validate
 
-            if [[ "$BRANCH_NAME" == "refs/heads/develop" ]]; then
-              ENVIRONMENT="dev"
-            elif [[ "$BRANCH_NAME" == "refs/heads/release" ]]; then
-              ENVIRONMENT="qa"
-            elif [[ "$BRANCH_NAME" == "refs/heads/support" ]]; then
-              ENVIRONMENT="atp"
-            else
-              # master/main/tags -> prod
-              ENVIRONMENT="prod"
-            fi
+  - task: Bash@3
+    displayName: 'Terraform plan (${{ parameters.environment }})'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -e
+        ENV="${{ parameters.environment }}"
+        IAC_DIR="iac/${ENV}"
+        TFVARS_FILE="${ENV}.tfvars"
 
-            echo "Using environment: $ENVIRONMENT"
-            echo "Terraform working dir: ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT"
+        cd $(Build.SourcesDirectory)/${IAC_DIR}
 
-            cd ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT
+        echo "Using tfvars: ${TFVARS_FILE}"
+        terraform plan -var-file=${TFVARS_FILE} -out=plan.tfplan
 
- 
-            terraform init -input=false
-            terraform fmt -check
-            terraform validate
+  # En dev se puede aplicar directo; en qa/prod típicamente lo amarro a aprobación manual
+  - ${{ if eq(parameters.environment, 'dev') }}:
+    - task: Bash@3
+      displayName: 'Terraform apply (dev)'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+          ENV="${{ parameters.environment }}"
+          IAC_DIR="iac/${ENV}"
 
-            terraform plan \
-              -input=false \
-              -out=plan.tfplan \
-              -var-file="${ENVIRONMENT}.tfvars"
-
-      - task: PublishBuildArtifacts@1
-        displayName: 'Publicar plan de Terraform'
-        inputs:
-          PathtoPublish: '${{ parameters.terraformWorkingDir }}'
-          ArtifactName: 'terraform-plan'
-          publishLocation: 'Container'
-
-      # Apply automático solo en dev/qa. Para atp/prod se espera aprobación/manual.
-      - task: Bash@3
-        displayName: 'Terraform apply (dev/qa)'
-        condition: or(
-          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
-          eq(variables['Build.SourceBranch'], 'refs/heads/release')
-        )
-        inputs:
-          targetType: 'inline'
-          script: |
-            set -e
-
-            BRANCH_NAME="$(Build.SourceBranch)"
-
-            if [[ "$BRANCH_NAME" == "refs/heads/develop" ]]; then
-              ENVIRONMENT="dev"
-            elif [[ "$BRANCH_NAME" == "refs/heads/release" ]]; then
-              ENVIRONMENT="qa"
-            else
-              echo "Terraform apply automático solo habilitado para dev/qa"
-              exit 0
-            fi
-
-            cd ${{ parameters.terraformWorkingDir }}/$ENVIRONMENT
-            terraform apply -input=false -auto-approve plan.tfplan
+          cd $(Build.SourcesDirectory)/${IAC_DIR}
+          terraform apply -auto-approve plan.tfplan

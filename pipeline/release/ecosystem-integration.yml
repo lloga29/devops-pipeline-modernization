@@ -1,5 +1,13 @@
-stages:
+parameters:
+- name: environment
+  type: string
+  default: 'dev'
+  values:
+    - dev
+    - qa
+    - prod
 
+stages:
 - stage: 'ecosystem_integration'
   ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
     displayName: 'Ecosystem Integration Development'
@@ -10,29 +18,33 @@ stages:
   ${{ if or(in(variables['Build.SourceBranch'], 'refs/heads/master' , 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/')) }}:
     displayName: 'Ecosystem Integration Production'
 
-  dependsOn: 
+  dependsOn:
     - 'artifacts_managment'
-    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
-      - 'development_integration'
-
-  condition:
-    in(dependencies.artifacts_managment.result, 'Succeeded', 'SucceededWithIssues')
-
-  pool:
-    name: hosted-dockerized-linux
 
   jobs:
-    # 1) Nuevo flujo GitOps: actualizar image.tag en los values de gitops/ (DEV/QA/PROD)
-    - template: jobs/Update-tag.yml
+    # 1) IaC con Terraform
+    - job: iac_${{ parameters.environment }}
+      displayName: 'IaC Terraform (${{ parameters.environment }})'
+      steps:
+        - template: terraform-iac.yml
+          parameters:
+            environment: ${{ parameters.environment }}
 
-    # 2) IaC con Terraform: validate/plan/apply según rama/entorno
-    - template: jobs/terraform-iac.yml
-      parameters:
-        terraformWorkingDir: 'iac'
+    # 2) Despliegue a Kubernetes (usa el artefacto ya generado en stages previos)
+    - job: k8s_deploy_${{ parameters.environment }}
+      displayName: 'Kubernetes deploy (${{ parameters.environment }})'
+      dependsOn: iac_${{ parameters.environment }}
+      steps:
+        - template: jobs/kubernetes-deploy-jobs.yml
+          parameters:
+            environment: ${{ parameters.environment }}
 
-    # 3) Despliegue directo al cluster (legacy) solo para ramas bajas (dev/support).
-    #    Para QA/Prod, la expectativa es que Argo CD/Kargo hagan el despliegue leyendo los manifests GitOps.
-    - ${{ if in(variables['Build.SourceBranch'], 'refs/heads/develop', 'refs/heads/support') }}:
-      - template: jobs/kubernetes-deploy-jobs.yml
-        parameters:
-          masteraks: ${{ parameters.masteraks }}
+    # 3) Actualización GitOps (values-<env>.yaml)
+    - job: gitops_update_${{ parameters.environment }}
+      displayName: 'GitOps update values-${{ parameters.environment }}.yaml'
+      dependsOn: k8s_deploy_${{ parameters.environment }}
+      steps:
+        - template: jobs/Update-tag.yml
+          parameters:
+            environment: ${{ parameters.environment }}
+            imageTag: $(Build.BuildNumber)   # o el tag que definas en 3.1
