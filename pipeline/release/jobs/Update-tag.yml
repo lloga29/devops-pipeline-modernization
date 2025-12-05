@@ -1,158 +1,44 @@
-  jobs:
-  - job: 'update_tag'
-    displayName: 'Update Tag'
-    dependsOn: 'release_aks'
-    pool: 
-      name: Vmss-Agents
+parameters:
+- name: environment
+  type: string
+  default: 'dev'
+  values:
+    - dev
+    - qa
+    - prod
 
-   
+- name: imageTag
+  type: string
 
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
-      variables:
-      - template: ../../SatrackVars.yml
-        
+steps:
+  - checkout: self
+    persistCredentials: true
 
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
-      variables:
-      - template: ../../SatrackVars.yml
+  - task: Bash@3
+    displayName: 'Update image.tag in GitOps values file'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -e
+        ENV="${{ parameters.environment }}"
+        TAG="${{ parameters.imageTag }}"
 
-    ${{ if and(eq(parameters['masteraks'], 'AksSatrackBigData'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
-      variables:
-      - template: ../../SatrackVars-Bigdata.yml
-      
-    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
-      variables:
-      - template: ../../SatrackVars-tracking.yml
-    
-    ${{ if and(eq(parameters['masteraks'], 'Aks-Tracking-Platform2'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
-      variables:
-      - template: ../../SatrackVars-tracking2.yml
+        case "${ENV}" in
+          dev)  VALUES_FILE="gitops/envs/dev/values-dev.yaml" ;;
+          qa)   VALUES_FILE="gitops/envs/qa/values-qa.yaml" ;;
+          prod) VALUES_FILE="gitops/envs/prod/values-prod.yaml" ;;
+          *)    echo "Unknown environment: ${ENV}"; exit 1 ;;
+        esac
 
-    
-    ${{ if and(eq(parameters['masteraks'], 'AksSatrack3'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+        cd $(Build.SourcesDirectory)
 
-      variables:
-      - template: ../../SatrackVars-aks3.yml
-        
-    
-    ${{ if and(eq(parameters['masteraks'], 'aks-products'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
-      variables:
-      - template: ../../SatrackVars-products.yml
-    
-    ${{ if and(eq(parameters['masteraks'], 'Aks-app-integrations'),eq(variables['Build.SourceBranch'], 'refs/heads/master')) }}:
+        echo "Updating image.tag to ${TAG} in ${VALUES_FILE}"
+        yq -i ".image.tag = \"${TAG}\"" "${VALUES_FILE}"
 
-      variables:
-      - template: ../../SatrackVars-app.yml 
-    
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/support') }}:
-      variables:
-      - template: ../../SatrackVars.yml
+        git config user.email "ci@satrack.local"
+        git config user.name  "CI Pipeline"
 
-
-  # =========================
-  # Steps: ya no retagean/pushean imágenes,
-  # ahora actualizan los values GitOps por entorno
-  # =========================
-    steps:
-    - checkout: self
-      displayName: 'Checkout repo (app + gitops)'
-
-    # --- DEV: rama develop → gitops/envs/dev/values-dev.yaml ---
-    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
-      - script: |
-          echo "=== GitOps: updating image tag for DEV ==="
-
-          VALUES_FILE="gitops/envs/dev/values-dev.yaml"
-          NEW_TAG="$(Build.BuildNumber)"
-
-          echo "File.......: ${VALUES_FILE}"
-          echo "New tag....: ${NEW_TAG}"
-          echo
-
-          if [ ! -f "${VALUES_FILE}" ]; then
-            echo "ERROR: values file not found: ${VALUES_FILE}"
-            exit 1
-          fi
-
-          echo "Before:"
-          grep 'tag:' "${VALUES_FILE}" || true
-          echo
-
-          # Ejemplo simple: sustituir la línea 'tag: ...'
-          # En un entorno real usaríamos 'yq' u otra herramienta YAML-aware.
-          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
-
-          echo "After:"
-          grep 'tag:' "${VALUES_FILE}" || true
-        displayName: 'Update image.tag in DEV values (GitOps)'
-
-    # --- QA: rama release → gitops/envs/qa/values-qa.yaml ---
-    - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/release') }}:
-      - script: |
-          echo "=== GitOps: updating image tag for QA ==="
-
-          VALUES_FILE="gitops/envs/qa/values-qa.yaml"
-          NEW_TAG="$(Build.BuildNumber)"
-
-          echo "File.......: ${VALUES_FILE}"
-          echo "New tag....: ${NEW_TAG}"
-          echo
-
-          if [ ! -f "${VALUES_FILE}" ]; then
-            echo "ERROR: values file not found: ${VALUES_FILE}"
-            exit 1
-          fi
-
-          echo "Before:"
-          grep 'tag:' "${VALUES_FILE}" || true
-          echo
-
-          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
-
-          echo "After:"
-          grep 'tag:' "${VALUES_FILE}" || true
-        displayName: 'Update image.tag in QA values (GitOps)'
-
-    # --- PROD: tags (ej. refs/tags/v1.2.3) → gitops/envs/prod/values-prod.yaml ---
-    - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
-      - script: |
-          echo "=== GitOps: updating image tag for PROD ==="
-
-          VALUES_FILE="gitops/envs/prod/values-prod.yaml"
-          NEW_TAG="$(Build.BuildNumber)"  # o la parte del tag que definas
-
-          echo "File.......: ${VALUES_FILE}"
-          echo "New tag....: ${NEW_TAG}"
-          echo
-
-          if [ ! -f "${VALUES_FILE}" ]; then
-            echo "ERROR: values file not found: ${VALUES_FILE}"
-            exit 1
-          fi
-
-          echo "Before:"
-          grep 'tag:' "${VALUES_FILE}" || true
-          echo
-
-          sed -i "s/^  tag: .*/  tag: ${NEW_TAG}/" "${VALUES_FILE}"
-
-          echo "After:"
-          grep 'tag:' "${VALUES_FILE}" || true
-        displayName: 'Update image.tag in PROD values (GitOps)'
-
-    # --- Placeholder: commit & push / PR ---
-    - script: |
-        echo "=== GitOps: commit & push placeholder ==="
-        echo "Aqui se configuraría git user/email y se haría commit de los values:"
-        echo "  git config user.name \"CI\""
-        echo "  git config user.email \"ci@example.com\""
-        echo "  git add gitops/envs/*/values-*.yaml"
-        echo "  git commit -m \"chore(gitops): update image tag to $(Build.BuildNumber)\""
-        echo "  git push origin HEAD"
-        echo
-        echo "En una implementación más avanzada, este paso podría crear un Pull Request hacia el repo GitOps real."
-      displayName: 'Commit & push to GitOps repo (conceptual)'
-      condition: succeeded():
-
-          
-    
+        git status
+        git add "${VALUES_FILE}"
+        git commit -m "chore(gitops): update image.tag to ${TAG} (${ENV})" || echo "No changes to commit"
+        git push || echo "Nothing to push (no changes)"
