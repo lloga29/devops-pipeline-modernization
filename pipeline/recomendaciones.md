@@ -175,3 +175,127 @@ Esto permite:
 - Tener trazabilidad completa de qué versión se desplegó en cada entorno a través del historial de Git.
 
 En resumen, en el punto 3.5 dejé el repositorio y el pipeline preparados para que IaC (Terraform) y GitOps trabajen juntos de forma coherente, y para que un cambio de nube no implique reescribir el pipeline, sino únicamente ajustar la capa de infraestructura y las variables de entorno.
+
+Mantener el esqueleto build → test → security → release → deploy
+
+Revisar pipeline/main.yml y validar que la estructura principal de stages se mantenga:
+
+build
+
+test
+
+security (solo si aplica)
+
+release
+
+deploy
+
+Los nuevos bloques (GitOps, IaC, multinube, seguridad extendida) deben colgarse de estos stages sin introducir “saltos” nuevos en el flujo.
+
+Definir flags de modo extendido en pipeline/variables.yml
+
+Añadir variables con valor por defecto false:
+
+enable_gitops: false
+
+enable_iac: false
+
+enable_security_scans: false
+
+enable_multicloud: false
+
+Reflejar estos flags también en SatrackVars-*.yml para poder activarlos por entorno y/o producto.
+
+Condicionar los bloques extendidos en pipeline/main.yml
+
+En los jobs/stages que implementan:
+
+Seguridad avanzada (3.2).
+
+GitOps (3.3).
+
+IaC/Terraform (3.4).
+
+Lógica multinube (3.5).
+
+Usar condiciones del estilo:
+
+if: and(succeeded(), eq(variables['enable_security_scans'], 'true'))
+
+if: and(succeeded(), eq(variables['enable_gitops'], 'true'))
+
+if: and(succeeded(), eq(variables['enable_iac'], 'true'))
+
+if: and(succeeded(), eq(variables['enable_multicloud'], 'true'))
+
+Con todos los flags en false, el pipeline debe comportarse igual que el original:
+
+Entra por build, pasa por test y va a release → deploy sin ejecutar bloques nuevos.
+
+Definir claramente modo legacy vs. modo extendido
+
+Documentar en pipeline/recomendaciones.md dos modos de operación:
+
+Modo legacy:
+
+Todos los flags en false.
+
+Mantiene semántica actual: build → test → deploy.
+
+Conserva triggers (develop, release, master/main, tags), artefactos y modelo de despliegue existente (scripts/herramientas actuales).
+
+Modo extendido:
+
+Activación selectiva por flags:
+
+enable_security_scans → activa stage/bloques de seguridad avanzada.
+
+enable_gitops → activa la ruta GitOps (actualización de repositorio de manifests).
+
+enable_iac → ejecuta bloques de Terraform (validate/plan/apply según entorno).
+
+enable_multicloud → habilita la lógica específica para multinube.
+
+Dejar explícito que los cambios son opt-in y reversibles apagando los flags.
+
+Definir fases de adopción
+
+Incluir en pipeline/recomendaciones.md un plan por fases:
+
+Fase 1 – MVP:
+
+Usar el template ya modificado pero con todos los flags en false.
+
+Validar que el comportamiento es equivalente al pipeline original de la prueba.
+
+Fase 2 – Pilotos:
+
+Seleccionar algunos servicios como early adopters.
+
+Activar enable_security_scans y/o enable_gitops en entornos bajos (dev/test).
+
+Recoger feedback y ajustar templates/doc si es necesario.
+
+Fase 3 – Expansión:
+
+Activar gradualmente los flags en el resto de servicios por ondas.
+
+Mantener un plan de rollback simple: desactivar flags o apuntar al template previo si algo falla.
+
+Compatibilidad con triggers, despliegue actual y credenciales
+
+Triggers existentes:
+
+Mantener la misma configuración de disparadores por rama/tag/PR.
+
+Evitar cambios en la interfaz de uso del pipeline para los equipos actuales.
+
+Modelo de despliegue actual:
+
+Aunque se active enable_gitops, definir un periodo en el que el despliegue legacy siga disponible (por ejemplo, protegido por otro flag o como fallback).
+
+Gestión de credenciales:
+
+Reutilizar service connections, key vaults y mecanismos actuales de credenciales.
+
+Las nuevas integraciones (Terraform, Argo CD, registries multi-cloud) deben usar el mismo patrón de gestión de secretos, sin hardcodear credenciales en YAML.
